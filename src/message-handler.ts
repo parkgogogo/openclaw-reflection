@@ -6,8 +6,11 @@ interface MessageEvent {
   message?: {
     id?: string;
     content?: string;
+    text?: string;
     channelId?: string;
   };
+  content?: string;
+  text?: string;
   sessionKey?: string;
   channelId?: string;
 }
@@ -22,15 +25,20 @@ function normalizeMessageEvent(event: unknown): MessageEvent {
   }
 
   const rawMessage = isRecord(event.message) ? event.message : undefined;
+  
+  // Get content from either message.content, message.text, event.content, or event.text
+  const content = rawMessage 
+    ? (typeof rawMessage.content === 'string' ? rawMessage.content : typeof rawMessage.text === 'string' ? rawMessage.text : undefined)
+    : (typeof event.content === 'string' ? event.content : typeof event.text === 'string' ? event.text : undefined);
 
   return {
     sessionKey: typeof event.sessionKey === 'string' && event.sessionKey.trim() !== '' ? event.sessionKey : undefined,
     channelId: typeof event.channelId === 'string' && event.channelId.trim() !== '' ? event.channelId : undefined,
-    message: rawMessage
+    message: content !== undefined
       ? {
-          id: typeof rawMessage.id === 'string' ? rawMessage.id : undefined,
-          content: typeof rawMessage.content === 'string' ? rawMessage.content : undefined,
-          channelId: typeof rawMessage.channelId === 'string' ? rawMessage.channelId : undefined,
+          id: rawMessage && typeof rawMessage.id === 'string' ? rawMessage.id : undefined,
+          content,
+          channelId: rawMessage && typeof rawMessage.channelId === 'string' ? rawMessage.channelId : undefined,
         }
       : undefined,
   };
