@@ -182,6 +182,12 @@ api.registerHook('session:end', async (event) => {
 
 ## 日志设计
 
+### 日志职责划分
+
+- Gateway Logger (`api.logger`): 仅在 `src/index.ts` 记录插件生命周期（启动、配置加载、初始化完成、hook 注册完成、重复注册保护）。
+- FileLogger (`src/logger.ts`): 记录所有详细事件（`message:received` / `message:sent` / `session:end` 的处理细节、SessionBufferManager 的缓冲区行为）。
+- 不再使用组合型 logger（CombinedLogger）；业务代码统一依赖 `FileLogger` 对外提供的 `Logger` 接口。
+
 ### 日志级别
 
 | 级别 | 使用场景 |
@@ -214,7 +220,7 @@ interface LogEntry {
 [2024-03-04T10:35:00.000Z] [info] [session] session_end {sessionKey: "agent:main:telegram:123456", reason: "user_reset"}
 ```
 
-### Logger 实现
+### FileLogger 实现
 
 日志写入插件根目录下的 `logs/` 文件夹：
 
@@ -223,7 +229,7 @@ interface LogEntry {
 import { appendFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 
-class Logger {
+class FileLogger {
   private level: number;
   private logDir: string;
   private logFile: string;
@@ -317,18 +323,31 @@ private rotateIfNeeded(): void {
 }
 ```
 
-### 获取插件根目录
+### 入口初始化示例
 
-在 register 函数中获取插件目录：
+在 `index.ts` 中初始化并分配日志职责：
 
 ```typescript
-export default function register(api: OpenClawPluginApi) {
-  // 通过 api 获取插件配置目录
-  const pluginDir = api.pluginDir ?? process.cwd();
-  
-  const logger = new Logger(pluginDir, api.pluginConfig?.logLevel ?? 'info');
-  
-  // ... 后续初始化
+export default function activate(api: PluginAPI): void {
+  const gatewayLogger = api.logger;
+  gatewayLogger.info('[Reflection] Plugin starting...');
+
+  const config = parseConfig(api);
+  gatewayLogger.info('[Reflection] Configuration loaded', {
+    bufferSize: config.bufferSize,
+    logLevel: config.logLevel,
+  });
+
+  const pluginRootDir = resolvePluginRootDir();
+  const fileLogger = new FileLogger(pluginRootDir, config.logLevel);
+  gatewayLogger.info('[Reflection] File logger initialized');
+
+  const bufferManager = new SessionBufferManager(config.bufferSize, fileLogger);
+  gatewayLogger.info('[Reflection] SessionBufferManager initialized');
+
+  api.registerHook('message:received', (event) => {
+    handleMessageReceived(event, bufferManager, fileLogger);
+  });
 }
 ```
 
@@ -336,6 +355,7 @@ export default function register(api: OpenClawPluginApi) {
 
 | 位置 | 事件 | 级别 | 内容 |
 |------|------|------|------|
+| index.ts (Gateway Logger) | 插件生命周期日志 | info/warn | 启动、配置加载、初始化完成、重复注册 |
 | SessionBufferManager | 新 Session 创建 | info | sessionKey, 当前 Session 数 |
 | SessionBufferManager | Session 清理 | info | sessionKey, 原因 (ttl/max) |
 | CircularBuffer | 消息被驱逐 | debug | messageId, 被驱逐消息 ID |
