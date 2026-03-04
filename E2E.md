@@ -62,11 +62,6 @@
         "minimum": 1,
         "default": 100
       },
-      "sessionTTL": {
-        "type": "integer",
-        "minimum": 1,
-        "default": 3600000
-      },
       "logLevel": {
         "type": "string",
         "enum": ["debug", "info", "warn", "error"],
@@ -89,7 +84,6 @@
         "enabled": true,
         "config": {
           "bufferSize": 50,
-          "sessionTTL": 300000,
           "logLevel": "debug"
         }
       }
@@ -144,7 +138,7 @@ openclaw gateway health
 ```
 [info] Plugin loaded: reflection-plugin
 [info] Reflection plugin registered
-[info] bufferSize: 50, sessionTTL: 300000, logLevel: debug
+[info] bufferSize: 50, logLevel: debug
 [info] Hooks registered successfully
 ```
 
@@ -232,7 +226,6 @@ tail -20 logs/reflection-$(date +%Y-%m-%d).log | jq .
         "enabled": true,
         "config": {
           "bufferSize": 3,
-          "sessionTTL": 300000,
           "logLevel": "debug"
         }
       }
@@ -270,48 +263,7 @@ cat logs/reflection-$(date +%Y-%m-%d).log | grep "Evicted oldest message"
 }
 ```
 
-### 场景 C: Session TTL 清理
-
-**修改配置：**
-```json
-{
-  "plugins": {
-    "entries": {
-      "reflection-plugin": {
-        "enabled": true,
-        "config": {
-          "bufferSize": 50,
-          "sessionTTL": 10000,
-          "logLevel": "debug"
-        }
-      }
-    }
-  }
-}
-```
-
-**步骤：**
-1. 重启 Gateway
-2. 发送消息建立 session
-3. 等待 10+ 秒（不发送新消息）
-4. 发送新消息触发 cleanup
-5. 验证 session 被清理
-
-**预期日志：**
-```json
-{
-  "timestamp": "...",
-  "level": "info",
-  "component": "SessionBufferManager",
-  "event": "Expired session cleaned up",
-  "details": {
-    "sessionKey": "...",
-    "cleanedCount": 1
-  }
-}
-```
-
-### 场景 D: Session 结束清理
+### 场景 C: Session 结束清理
 
 **步骤：**
 1. 正常对话几轮
@@ -433,7 +385,6 @@ ls -la /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin/openclaw.p
         "enabled": true,
         "config": {
           "bufferSize": 50,
-          "sessionTTL": 300000,
           "logLevel": "debug"
         }
       }
@@ -491,7 +442,6 @@ chmod 755 logs
 | 收到用户消息 | ⬜ | 日志中出现 "Message received" |
 | AI 回复被记录 | ⬜ | 日志中出现 "Message sent" |
 | Buffer 正确存储 | ⬜ | bufferSize 变化符合预期 |
-| 过期 Session 清理 | ⬜ | 日志中出现 "Expired session cleaned up" |
 | Session 结束清理 | ⬜ | `/reset` 后 buffer 被清理 |
 | 日志文件正常写入 | ⬜ | `logs/reflection-*.log` 存在且有内容 |
 
@@ -543,7 +493,7 @@ chmod 755 logs
   sessionKey: 'main:telegram:5847030824',
   timestamp: Date,
   context: {
-    reason?: 'user_reset' | 'ttl_expired'
+    reason?: 'user_reset'
   }
 }
 ```
@@ -566,7 +516,6 @@ chmod 755 logs
         "enabled": true,
         "config": {
           "bufferSize": 100,
-          "sessionTTL": 3600000,
           "logLevel": "info"
         }
       }
@@ -585,9 +534,8 @@ chmod 755 logs
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `bufferSize` | integer | 100 | 每个会话的缓冲区大小 |
-| `sessionTTL` | integer | 3600000 | Session 过期时间（毫秒） |
 | `logLevel` | string | "info" | 日志级别：debug/info/warn/error |
 
 ---
 
-*E2E Plan v2.0 by Lia* 🌸
+*E2E Plan v3.0 by Lia* 🌸

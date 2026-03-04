@@ -10,12 +10,10 @@ interface SessionData {
 export class SessionBufferManager {
   private sessions: Map<string, SessionData>;
   private capacity: number;
-  private ttlMs: number;
   private logger: Logger;
 
-  constructor(capacity: number, ttlMs: number, logger: Logger) {
+  constructor(capacity: number, logger: Logger) {
     this.capacity = capacity;
-    this.ttlMs = ttlMs;
     this.logger = logger;
     this.sessions = new Map();
   }
@@ -67,23 +65,6 @@ export class SessionBufferManager {
 
     if (existed) {
       this.logger.info('SessionBufferManager', 'Session cleared', { sessionKey }, sessionKey);
-    }
-  }
-
-  cleanup(): void {
-    const now = Date.now();
-    let cleanedCount = 0;
-
-    for (const [sessionKey, sessionData] of this.sessions.entries()) {
-      if (now - sessionData.lastAccessed > this.ttlMs) {
-        this.sessions.delete(sessionKey);
-        cleanedCount++;
-        this.logger.info('SessionBufferManager', 'Expired session cleaned up', { sessionKey }, sessionKey);
-      }
-    }
-
-    if (cleanedCount > 0) {
-      this.logger.info('SessionBufferManager', 'Cleanup completed', { cleanedCount });
     }
   }
 

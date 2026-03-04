@@ -8,7 +8,6 @@ interface PluginAPI {
 
 const DEFAULT_CONFIG: PluginConfig = {
   bufferSize: 100,
-  sessionTTL: 3600000,
   logLevel: 'info',
 };
 
@@ -35,7 +34,6 @@ export function parseConfig(api: PluginAPI): PluginConfig {
 
   return {
     bufferSize: getPositiveInteger(config.get?.('bufferSize'), DEFAULT_CONFIG.bufferSize),
-    sessionTTL: getPositiveInteger(config.get?.('sessionTTL'), DEFAULT_CONFIG.sessionTTL),
     logLevel: getLogLevel(config.get?.('logLevel')),
   };
 }

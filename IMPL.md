@@ -87,12 +87,10 @@ interface ReflectionMessage {
 class SessionBufferManager {
   private buffers: Map<string, CircularBuffer<ReflectionMessage>>;
   private capacity: number;
-  private ttlMs: number;           // Session 过期时间
 
-  constructor(capacity: number, ttlMs: number) {
+  constructor(capacity: number) {
     this.buffers = new Map();
     this.capacity = capacity;
-    this.ttlMs = ttlMs;
   }
 
   private getOrCreateBuffer(sessionKey: string): CircularBuffer<ReflectionMessage> {
@@ -117,11 +115,6 @@ class SessionBufferManager {
 
   clearSession(sessionKey: string): void {
     this.buffers.delete(sessionKey);
-  }
-
-  // 清理过期 Session
-  cleanup(): void {
-    // 实现 LRU 或定时清理逻辑
   }
 }
 ```
@@ -204,7 +197,7 @@ api.registerHook('session:end', async (event) => {
 interface LogEntry {
   timestamp: string;      // ISO 8601
   level: 'debug' | 'info' | 'warn' | 'error';
-  component: string;      // 'buffer' | 'session' | 'hook' | 'cleanup'
+  component: string;      // 'buffer' | 'session' | 'hook'
   sessionKey?: string;    // 关联的 session（如有）
   event: string;          // 事件类型
   details?: Record<string, unknown>;
@@ -218,7 +211,7 @@ interface LogEntry {
 [2024-03-04T10:30:01.456Z] [debug] [hook] message_received {sessionKey: "agent:main:telegram:123456", role: "user", contentLength: 12}
 [2024-03-04T10:30:02.789Z] [debug] [buffer] message_pushed {sessionKey: "agent:main:telegram:123456", bufferSize: 1/100}
 [2024-03-04T10:30:05.012Z] [debug] [hook] message_sent {sessionKey: "agent:main:telegram:123456", role: "assistant", success: true}
-[2024-03-04T10:35:00.000Z] [info] [session] session_cleanup {sessionKey: "agent:main:telegram:123456", reason: "ttl_expired"}
+[2024-03-04T10:35:00.000Z] [info] [session] session_end {sessionKey: "agent:main:telegram:123456", reason: "user_reset"}
 ```
 
 ### Logger 实现
@@ -357,23 +350,15 @@ export default function register(api: OpenClawPluginApi) {
 ```json
 {
   "id": "reflection-plugin",
+  "entry": "src/index.ts",
   "configSchema": {
     "type": "object",
     "properties": {
       "bufferSize": {
-        "type": "number",
+        "type": "integer",
+        "minimum": 1,
         "default": 100,
         "description": "每个会话的缓冲区大小"
-      },
-      "sessionTTL": {
-        "type": "number",
-        "default": 3600000,
-        "description": "Session 过期时间 (ms)"
-      },
-      "persistBuffer": {
-        "type": "boolean",
-        "default": false,
-        "description": "是否持久化缓冲区到磁盘"
       },
       "logLevel": {
         "type": "string",
@@ -434,8 +419,7 @@ logs/
 
 ### Phase 3: 配置与优化 (Day 3)
 1. 添加配置解析 (`config.ts`)
-2. 实现 Session TTL 清理机制
-3. 内存压力测试
+2. 内存压力测试
 
 ### Phase 4: 测试与文档 (Day 4)
 1. 编写集成测试
@@ -507,7 +491,7 @@ expect(messages[0].role).toBe('user');
 
 | 风险 | 影响 | 缓解措施 |
 |------|------|----------|
-| 内存泄漏 | 高 | 设置 Session TTL，定期清理；限制最大 Session 数 |
+| 内存泄漏 | 高 | 限制最大 Session 数；使用 session:end 钩子清理 |
 | Hook 字段变化 | 中 | 添加字段存在性检查；版本兼容性处理 |
 | 高频消息性能 | 中 | 使用 O(1) 的环形缓冲区；异步处理 |
 | 并发问题 | 低 | 单线程 Gateway 环境，无需锁 |

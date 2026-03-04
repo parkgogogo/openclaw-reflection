@@ -26,6 +26,5 @@ export interface LogEntry {
 
 export interface PluginConfig {
   bufferSize: number;
-  sessionTTL: number;
   logLevel: LogLevel;
 }

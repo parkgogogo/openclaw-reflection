@@ -17,7 +17,6 @@ interface PluginAPI {
 
 let bufferManager: SessionBufferManager | null = null;
 let logger: Logger | null = null;
-let cleanupTimer: NodeJS.Timeout | null = null;
 let isRegistered = false;
 
 export function register(api: PluginAPI): void {
@@ -34,11 +33,10 @@ export function register(api: PluginAPI): void {
   const pluginRootDir = path.resolve(__dirname, '..');
 
   logger = new Logger(pluginRootDir, config.logLevel);
-  bufferManager = new SessionBufferManager(config.bufferSize, config.sessionTTL, logger);
+  bufferManager = new SessionBufferManager(config.bufferSize, logger);
 
   logger.info('Plugin', 'Reflection plugin registered', {
     bufferSize: config.bufferSize,
-    sessionTTL: config.sessionTTL,
     logLevel: config.logLevel,
   });
 
@@ -60,20 +58,6 @@ export function register(api: PluginAPI): void {
       handleSessionEnd(event, bufferManager, logger);
     }
   });
-
-  if (cleanupTimer) {
-    clearInterval(cleanupTimer);
-  }
-
-  // Setup periodic cleanup
-  const CLEANUP_INTERVAL = 60000; // 1 minute
-  cleanupTimer = setInterval(() => {
-    bufferManager?.cleanup();
-  }, CLEANUP_INTERVAL);
-
-  if (typeof cleanupTimer.unref === 'function') {
-    cleanupTimer.unref();
-  }
 
   isRegistered = true;
   logger.info('Plugin', 'Hooks registered successfully');
