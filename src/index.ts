@@ -10,9 +10,7 @@ interface PluginAPI {
   config?: {
     get?: (key: string) => unknown;
   };
-  hooks: {
-    on: (event: string, handler: (event: unknown) => void) => void;
-  };
+  registerHook: (event: string, handler: (event: unknown) => void) => void;
 }
 
 let bufferManager: SessionBufferManager | null = null;
@@ -41,19 +39,19 @@ export function register(api: PluginAPI): void {
   });
 
   // Register hooks
-  api.hooks.on('message:received', (event: unknown) => {
+  api.registerHook('message:received', (event: unknown) => {
     if (bufferManager && logger) {
       handleMessageReceived(event, bufferManager, logger);
     }
   });
 
-  api.hooks.on('message:sent', (event: unknown) => {
+  api.registerHook('message:sent', (event: unknown) => {
     if (bufferManager && logger) {
       handleMessageSent(event, bufferManager, logger);
     }
   });
 
-  api.hooks.on('session:end', (event: unknown) => {
+  api.registerHook('session:end', (event: unknown) => {
     if (bufferManager && logger) {
       handleSessionEnd(event, bufferManager, logger);
     }
