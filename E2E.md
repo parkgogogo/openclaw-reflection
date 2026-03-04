@@ -48,12 +48,12 @@
 
 ### 1.1 确认插件 ID
 
-编辑 `openclaw.plugin.json`，确认插件 ID：
+编辑 `openclaw.plugin.json`，确认插件 ID 和入口文件：
 
 ```json
 {
   "id": "reflection-plugin",
-  "entry": "dist/index.js",
+  "entry": "src/index.ts",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -112,20 +112,7 @@
 | `plugins.entries.<id>.config` | 插件自定义配置，根据 `configSchema` 校验 |
 | `plugins.load.paths` | 本地插件路径数组，OpenClaw 会从这些路径加载插件 |
 
-### 1.3 构建插件
-
-```bash
-cd /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin
-
-# 安装依赖
-npm install
-
-# 构建 TypeScript
-npm run build
-
-# 确认输出文件存在
-ls -la dist/index.js
-```
+> 💡 **注意**：OpenClaw 内置 [jiti](https://github.com/unjs/jiti) runtime，可以直接加载 TypeScript 文件，无需手动构建。
 
 ---
 
@@ -415,7 +402,7 @@ cat logs/reflection-$(date +%Y-%m-%d).log | jq 'select(.level == "info" or .leve
 1. Gateway 是否重启？
 2. `openclaw.plugin.json` 中的 `id` 是否与 `openclaw.json` 中的 key 匹配？
 3. `plugins.load.paths` 路径是否正确？
-4. `dist/index.js` 是否已构建？
+4. `openclaw.plugin.json` 中的 `entry` 是否指向正确的文件？
 
 **调试命令：**
 ```bash
@@ -426,7 +413,7 @@ openclaw gateway --verbose
 openclaw config get plugins
 
 # 验证文件存在
-ls -la /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin/dist/index.js
+ls -la /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin/src/index.ts
 ls -la /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin/openclaw.plugin.json
 ```
 
