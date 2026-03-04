@@ -3,17 +3,21 @@ export class CircularBuffer<T> {
   private capacity: number;
 
   constructor(capacity: number) {
+    if (!Number.isInteger(capacity) || capacity <= 0) {
+      throw new Error('CircularBuffer capacity must be a positive integer');
+    }
+
     this.capacity = capacity;
     this.buffer = [];
   }
 
   push(item: T): T | null {
     let evicted: T | null = null;
-    
+
     if (this.isFull()) {
       evicted = this.buffer.shift() ?? null;
     }
-    
+
     this.buffer.push(item);
     return evicted;
   }

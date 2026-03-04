@@ -4,11 +4,13 @@
     "type": "object",
     "properties": {
       "bufferSize": {
-        "type": "number",
+        "type": "integer",
+        "minimum": 1,
         "default": 100
       },
       "sessionTTL": {
-        "type": "number",
+        "type": "integer",
+        "minimum": 1,
         "default": 3600000
       },
       "logLevel": {

@@ -1,4 +1,4 @@
-import type { PluginConfig } from './types.js';
+import type { LogLevel, PluginConfig } from './types.js';
 
 interface PluginAPI {
   config?: {
@@ -6,16 +6,36 @@ interface PluginAPI {
   };
 }
 
+const DEFAULT_CONFIG: PluginConfig = {
+  bufferSize: 100,
+  sessionTTL: 3600000,
+  logLevel: 'info',
+};
+
+const VALID_LOG_LEVELS = new Set<LogLevel>(['debug', 'info', 'warn', 'error']);
+
+function getPositiveInteger(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    return fallback;
+  }
+
+  return value;
+}
+
+function getLogLevel(value: unknown): LogLevel {
+  if (typeof value === 'string' && VALID_LOG_LEVELS.has(value as LogLevel)) {
+    return value as LogLevel;
+  }
+
+  return DEFAULT_CONFIG.logLevel;
+}
+
 export function parseConfig(api: PluginAPI): PluginConfig {
   const config = api.config ?? {};
 
-  const bufferSize = config.get?.('bufferSize');
-  const sessionTTL = config.get?.('sessionTTL');
-  const logLevel = config.get?.('logLevel');
-
   return {
-    bufferSize: typeof bufferSize === 'number' ? bufferSize : 100,
-    sessionTTL: typeof sessionTTL === 'number' ? sessionTTL : 3600000,
-    logLevel: typeof logLevel === 'string' ? logLevel : 'info',
+    bufferSize: getPositiveInteger(config.get?.('bufferSize'), DEFAULT_CONFIG.bufferSize),
+    sessionTTL: getPositiveInteger(config.get?.('sessionTTL'), DEFAULT_CONFIG.sessionTTL),
+    logLevel: getLogLevel(config.get?.('logLevel')),
   };
 }

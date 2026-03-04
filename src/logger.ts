@@ -1,22 +1,30 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { LogEntry } from './types.js';
+import type { LogEntry, LogLevel } from './types.js';
 
-const LOG_LEVELS: Record<string, number> = {
+const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 0,
   info: 1,
   warn: 2,
   error: 3,
 };
 
+function parseLogLevel(level: string): LogLevel {
+  if (level === 'debug' || level === 'info' || level === 'warn' || level === 'error') {
+    return level;
+  }
+
+  return 'info';
+}
+
 export class Logger {
   private pluginRootDir: string;
-  private level: string;
+  private level: LogLevel;
   private logsDir: string;
 
   constructor(pluginRootDir: string, level: string) {
     this.pluginRootDir = pluginRootDir;
-    this.level = level;
+    this.level = parseLogLevel(level);
     this.logsDir = path.join(pluginRootDir, 'logs');
     this.ensureLogsDir();
   }
@@ -32,7 +40,7 @@ export class Logger {
     return path.join(this.logsDir, `reflection-${date}.log`);
   }
 
-  private shouldLog(level: string): boolean {
+  private shouldLog(level: LogLevel): boolean {
     return LOG_LEVELS[level] >= LOG_LEVELS[this.level];
   }
 
@@ -43,7 +51,7 @@ export class Logger {
   private writeLog(entry: LogEntry): void {
     const logLine = JSON.stringify(entry) + '\n';
     const logFile = this.getLogFilePath();
-    
+
     try {
       fs.appendFileSync(logFile, logLine, 'utf-8');
     } catch (err) {
@@ -52,7 +60,7 @@ export class Logger {
   }
 
   private log(
-    level: 'debug' | 'info' | 'warn' | 'error',
+    level: LogLevel,
     component: string,
     event: string,
     details?: Record<string, unknown>,

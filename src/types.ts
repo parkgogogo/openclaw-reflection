@@ -1,3 +1,5 @@
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
 export interface ReflectionMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -15,7 +17,7 @@ export interface ReflectionMessage {
 
 export interface LogEntry {
   timestamp: string;
-  level: 'debug' | 'info' | 'warn' | 'error';
+  level: LogLevel;
   component: string;
   sessionKey?: string;
   event: string;
@@ -25,10 +27,5 @@ export interface LogEntry {
 export interface PluginConfig {
   bufferSize: number;
   sessionTTL: number;
-  logLevel: string;
-}
-
-export interface SessionData {
-  buffer: ReflectionMessage[];
-  lastAccessed: number;
+  logLevel: LogLevel;
 }

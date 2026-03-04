@@ -17,10 +17,17 @@ interface PluginAPI {
 
 let bufferManager: SessionBufferManager | null = null;
 let logger: Logger | null = null;
+let cleanupTimer: NodeJS.Timeout | null = null;
+let isRegistered = false;
 
 export function register(api: PluginAPI): void {
+  if (isRegistered) {
+    logger?.warn('Plugin', 'register called more than once, skipping duplicate registration');
+    return;
+  }
+
   const config: PluginConfig = parseConfig(api);
-  
+
   // Determine plugin root directory
   const __filename = url.fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -38,27 +45,36 @@ export function register(api: PluginAPI): void {
   // Register hooks
   api.hooks.on('message:received', (event: unknown) => {
     if (bufferManager && logger) {
-      handleMessageReceived(event as Parameters<typeof handleMessageReceived>[0], bufferManager, logger);
+      handleMessageReceived(event, bufferManager, logger);
     }
   });
 
   api.hooks.on('message:sent', (event: unknown) => {
     if (bufferManager && logger) {
-      handleMessageSent(event as Parameters<typeof handleMessageSent>[0], bufferManager, logger);
+      handleMessageSent(event, bufferManager, logger);
     }
   });
 
   api.hooks.on('session:end', (event: unknown) => {
     if (bufferManager && logger) {
-      handleSessionEnd(event as Parameters<typeof handleSessionEnd>[0], bufferManager, logger);
+      handleSessionEnd(event, bufferManager, logger);
     }
   });
 
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+  }
+
   // Setup periodic cleanup
   const CLEANUP_INTERVAL = 60000; // 1 minute
-  setInterval(() => {
+  cleanupTimer = setInterval(() => {
     bufferManager?.cleanup();
   }, CLEANUP_INTERVAL);
 
+  if (typeof cleanupTimer.unref === 'function') {
+    cleanupTimer.unref();
+  }
+
+  isRegistered = true;
   logger.info('Plugin', 'Hooks registered successfully');
 }

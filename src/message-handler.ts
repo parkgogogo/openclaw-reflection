@@ -13,6 +13,43 @@ interface MessageEvent {
   channelId?: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function normalizeMessageEvent(event: unknown): MessageEvent {
+  if (!isRecord(event)) {
+    return {};
+  }
+
+  const rawMessage = isRecord(event.message) ? event.message : undefined;
+
+  return {
+    sessionKey: typeof event.sessionKey === 'string' && event.sessionKey.trim() !== '' ? event.sessionKey : undefined,
+    channelId: typeof event.channelId === 'string' && event.channelId.trim() !== '' ? event.channelId : undefined,
+    message: rawMessage
+      ? {
+          id: typeof rawMessage.id === 'string' ? rawMessage.id : undefined,
+          content: typeof rawMessage.content === 'string' ? rawMessage.content : undefined,
+          channelId: typeof rawMessage.channelId === 'string' ? rawMessage.channelId : undefined,
+        }
+      : undefined,
+  };
+}
+
+function resolveSessionKey(event: MessageEvent, logger: Logger, hookName: string): string | null {
+  if (event.sessionKey) {
+    return event.sessionKey;
+  }
+
+  logger.warn('MessageHandler', 'Skip event without sessionKey', { hookName });
+  return null;
+}
+
+function resolveChannelId(event: MessageEvent): string {
+  return event.channelId ?? event.message?.channelId ?? 'unknown';
+}
+
 function createReflectionMessage(
   event: MessageEvent,
   role: 'user' | 'assistant',
@@ -32,52 +69,67 @@ function createReflectionMessage(
   };
 }
 
-export function handleMessageReceived(
-  event: MessageEvent,
-  bufferManager: SessionBufferManager,
-  logger: Logger
-): void {
-  const sessionKey = event.sessionKey ?? 'unknown';
-  const channelId = event.channelId ?? event.message?.channelId ?? 'unknown';
+export function handleMessageReceived(event: unknown, bufferManager: SessionBufferManager, logger: Logger): void {
+  const normalizedEvent = normalizeMessageEvent(event);
+  const sessionKey = resolveSessionKey(normalizedEvent, logger, 'message:received');
 
-  logger.debug('MessageHandler', 'Message received', { 
-    sessionKey, 
-    channelId,
-    hasContent: !!event.message?.content 
-  }, sessionKey);
+  if (!sessionKey) {
+    return;
+  }
 
-  const message = createReflectionMessage(event, 'user', sessionKey, channelId);
+  const channelId = resolveChannelId(normalizedEvent);
+
+  logger.debug(
+    'MessageHandler',
+    'Message received',
+    {
+      sessionKey,
+      channelId,
+      hasContent: !!normalizedEvent.message?.content,
+    },
+    sessionKey
+  );
+
+  const message = createReflectionMessage(normalizedEvent, 'user', sessionKey, channelId);
   bufferManager.push(sessionKey, message);
 
   logger.debug('MessageHandler', 'User message stored', { messageId: message.id }, sessionKey);
 }
 
-export function handleMessageSent(
-  event: MessageEvent,
-  bufferManager: SessionBufferManager,
-  logger: Logger
-): void {
-  const sessionKey = event.sessionKey ?? 'unknown';
-  const channelId = event.channelId ?? event.message?.channelId ?? 'unknown';
+export function handleMessageSent(event: unknown, bufferManager: SessionBufferManager, logger: Logger): void {
+  const normalizedEvent = normalizeMessageEvent(event);
+  const sessionKey = resolveSessionKey(normalizedEvent, logger, 'message:sent');
 
-  logger.debug('MessageHandler', 'Message sent', { 
-    sessionKey, 
-    channelId,
-    hasContent: !!event.message?.content 
-  }, sessionKey);
+  if (!sessionKey) {
+    return;
+  }
 
-  const message = createReflectionMessage(event, 'assistant', sessionKey, channelId);
+  const channelId = resolveChannelId(normalizedEvent);
+
+  logger.debug(
+    'MessageHandler',
+    'Message sent',
+    {
+      sessionKey,
+      channelId,
+      hasContent: !!normalizedEvent.message?.content,
+    },
+    sessionKey
+  );
+
+  const message = createReflectionMessage(normalizedEvent, 'assistant', sessionKey, channelId);
   bufferManager.push(sessionKey, message);
 
   logger.debug('MessageHandler', 'Assistant message stored', { messageId: message.id }, sessionKey);
 }
 
-export function handleSessionEnd(
-  event: { sessionKey?: string },
-  bufferManager: SessionBufferManager,
-  logger: Logger
-): void {
-  const sessionKey = event.sessionKey ?? 'unknown';
+export function handleSessionEnd(event: unknown, bufferManager: SessionBufferManager, logger: Logger): void {
+  const normalizedEvent = normalizeMessageEvent(event);
+  const sessionKey = resolveSessionKey(normalizedEvent, logger, 'session:end');
+
+  if (!sessionKey) {
+    return;
+  }
 
   logger.info('MessageHandler', 'Session ended, clearing buffer', { sessionKey }, sessionKey);
   bufferManager.clearSession(sessionKey);
