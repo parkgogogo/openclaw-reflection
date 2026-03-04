@@ -187,57 +187,102 @@ api.registerHook('session:end', async (event) => {
 
 ---
 
-## 查询接口设计
+## 日志设计
 
-通过 `registerTool` 暴露查询能力：
+### 日志级别
+
+| 级别 | 使用场景 |
+|------|----------|
+| `debug` | 详细的事件追踪、缓冲区状态、消息内容 |
+| `info` | 关键事件：Session 创建/清理、消息进入/驱逐 |
+| `warn` | 异常情况：字段缺失、解析失败、缓冲区满 |
+| `error` | 严重错误：Hook 处理异常、内存不足 |
+
+### 日志内容规范
 
 ```typescript
-api.registerTool({
-  name: 'reflection_get_messages',
-  description: '获取当前会话的反射缓冲区消息',
-  parameters: {
-    type: 'object',
-    properties: {
-      sessionKey: {
-        type: 'string',
-        description: '会话密钥 (可选，默认当前会话)',
-      },
-      limit: {
-        type: 'number',
-        description: '返回消息数量限制',
-        default: 50,
-      },
-    },
-  },
-  async execute(args, context) {
-    const sessionKey = args.sessionKey ?? context.sessionKey;
-    const messages = bufferManager.getMessages(sessionKey);
-    return {
-      messages: args.limit ? messages.slice(-args.limit) : messages,
-      total: messages.length,
-    };
-  },
-});
-
-api.registerTool({
-  name: 'reflection_clear',
-  description: '清空当前会话的反射缓冲区',
-  parameters: {
-    type: 'object',
-    properties: {
-      sessionKey: {
-        type: 'string',
-        description: '会话密钥 (可选，默认当前会话)',
-      },
-    },
-  },
-  async execute(args, context) {
-    const sessionKey = args.sessionKey ?? context.sessionKey;
-    bufferManager.clearSession(sessionKey);
-    return { success: true, message: 'Buffer cleared' };
-  },
-});
+interface LogEntry {
+  timestamp: string;      // ISO 8601
+  level: 'debug' | 'info' | 'warn' | 'error';
+  component: string;      // 'buffer' | 'session' | 'hook' | 'cleanup'
+  sessionKey?: string;    // 关联的 session（如有）
+  event: string;          // 事件类型
+  details?: Record<string, unknown>;
+}
 ```
+
+### 日志输出示例
+
+```
+[2024-03-04T10:30:00.123Z] [info] [session] session_created {sessionKey: "agent:main:telegram:123456"}
+[2024-03-04T10:30:01.456Z] [debug] [hook] message_received {sessionKey: "agent:main:telegram:123456", role: "user", contentLength: 12}
+[2024-03-04T10:30:02.789Z] [debug] [buffer] message_pushed {sessionKey: "agent:main:telegram:123456", bufferSize: 1/100}
+[2024-03-04T10:30:05.012Z] [debug] [hook] message_sent {sessionKey: "agent:main:telegram:123456", role: "assistant", success: true}
+[2024-03-04T10:35:00.000Z] [info] [session] session_cleanup {sessionKey: "agent:main:telegram:123456", reason: "ttl_expired"}
+```
+
+### Logger 实现
+
+```typescript
+// logger.ts
+class Logger {
+  private level: number;
+  private levels = { debug: 0, info: 1, warn: 2, error: 3 };
+
+  constructor(level: string = 'info') {
+    this.level = this.levels[level as keyof typeof this.levels] ?? 1;
+  }
+
+  private log(
+    level: keyof typeof this.levels,
+    component: string,
+    event: string,
+    details?: Record<string, unknown>,
+    sessionKey?: string
+  ) {
+    if (this.levels[level] < this.level) return;
+
+    const entry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      component,
+      event,
+      details,
+      ...(sessionKey && { sessionKey }),
+    };
+
+    // 输出到 Gateway 日志系统
+    console.log(JSON.stringify(entry));
+  }
+
+  debug(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string) {
+    this.log('debug', component, event, details, sessionKey);
+  }
+
+  info(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string) {
+    this.log('info', component, event, details, sessionKey);
+  }
+
+  warn(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string) {
+    this.log('warn', component, event, details, sessionKey);
+  }
+
+  error(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string) {
+    this.log('error', component, event, details, sessionKey);
+  }
+}
+```
+
+### 关键日志点
+
+| 位置 | 事件 | 级别 | 内容 |
+|------|------|------|------|
+| SessionBufferManager | 新 Session 创建 | info | sessionKey, 当前 Session 数 |
+| SessionBufferManager | Session 清理 | info | sessionKey, 原因 (ttl/max) |
+| CircularBuffer | 消息被驱逐 | debug | messageId, 被驱逐消息 ID |
+| message:received | 收到消息 | debug | role, contentLength |
+| message:sent | 发送消息 | debug | role, success |
+| session:end | Session 结束 | info | sessionKey |
 
 ---
 
@@ -287,7 +332,7 @@ openclaw-reflection-plugin/
 │   ├── buffer.ts             # CircularBuffer 实现
 │   ├── session-manager.ts    # SessionBufferManager
 │   ├── message-handler.ts    # Hook 处理逻辑
-│   ├── query-tools.ts        # 查询工具注册
+│   ├── logger.ts             # 日志模块
 │   ├── types.ts              # TypeScript 类型定义
 │   └── config.ts             # 配置解析
 ├── tests/
@@ -304,21 +349,23 @@ openclaw-reflection-plugin/
 1. 搭建 TypeScript 项目结构
 2. 实现 `CircularBuffer` 类 + 单元测试
 3. 定义类型接口 (`types.ts`)
+4. 实现 `Logger` 模块
 
 ### Phase 2: 核心功能 (Day 2)
 1. 实现 `SessionBufferManager`
 2. 编写 Hook 处理逻辑 (`message-handler.ts`)
 3. 集成到 `index.ts` 的 `register` 函数
+4. 添加日志埋点
 
-### Phase 3: 查询接口 (Day 3)
-1. 实现 `reflection_get_messages` 工具
-2. 实现 `reflection_clear` 工具
-3. 添加配置解析
+### Phase 3: 配置与优化 (Day 3)
+1. 添加配置解析 (`config.ts`)
+2. 实现 Session TTL 清理机制
+3. 内存压力测试
 
-### Phase 4: 测试与优化 (Day 4)
+### Phase 4: 测试与文档 (Day 4)
 1. 编写集成测试
-2. 内存压力测试
-3. 性能优化（如有需要）
+2. 完善日志输出
+3. 更新文档
 
 ---
 
