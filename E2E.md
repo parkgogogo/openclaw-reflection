@@ -46,40 +46,9 @@
 
 ## Phase 1: 插件部署
 
-### 1.1 确认插件位置
+### 1.1 确认插件 ID
 
-```bash
-# 插件应位于 OpenClaw 的 plugins 目录
-# 标准路径：~/.openclaw/plugins/ 或 workspace 的相对路径
-
-# 检查当前插件位置
-ls -la ~/.openclaw/plugins/openclaw-reflection-plugin 2>/dev/null \
-  || ls -la /opt/homebrew/lib/node_modules/openclaw/plugins/ 2>/dev/null \
-  || echo "需要手动配置插件路径"
-```
-
-### 1.2 OpenClaw 配置
-
-编辑 `~/.openclaw/config.yaml`：
-
-```yaml
-plugins:
-  # 方式1: 本地路径
-  - path: /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin
-    config:
-      bufferSize: 50
-      sessionTTL: 300000  # 5分钟，方便测试
-      logLevel: debug
-
-  # 方式2: npm 包名（发布后）
-  # - package: openclaw-reflection-plugin
-  #   config:
-  #     bufferSize: 100
-```
-
-### 1.3 插件清单确认
-
-确保 `openclaw.plugin.json`：
+编辑 `openclaw.plugin.json`，确认插件 ID：
 
 ```json
 {
@@ -108,31 +77,97 @@ plugins:
 }
 ```
 
----
+### 1.2 OpenClaw 配置
 
-## Phase 2: 启动验证
+编辑 `~/.openclaw/openclaw.json`：
 
-### 2.1 构建并重启 Gateway
+```json
+{
+  "plugins": {
+    "entries": {
+      "reflection-plugin": {
+        "enabled": true,
+        "config": {
+          "bufferSize": 50,
+          "sessionTTL": 300000,
+          "logLevel": "debug"
+        }
+      }
+    },
+    "load": {
+      "paths": [
+        "/Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin"
+      ]
+    }
+  }
+}
+```
+
+**关键配置说明：**
+
+| 配置项 | 说明 |
+|--------|------|
+| `plugins.entries.<id>` | 必须与 `openclaw.plugin.json` 中的 `id` 完全一致 |
+| `plugins.entries.<id>.enabled` | 启用/禁用插件 |
+| `plugins.entries.<id>.config` | 插件自定义配置，根据 `configSchema` 校验 |
+| `plugins.load.paths` | 本地插件路径数组，OpenClaw 会从这些路径加载插件 |
+
+### 1.3 构建插件
 
 ```bash
 cd /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin
 
-# 1. 重新构建
+# 安装依赖
+npm install
+
+# 构建 TypeScript
 npm run build
 
-# 2. 重启 OpenClaw Gateway
+# 确认输出文件存在
+ls -la dist/index.js
+```
+
+---
+
+## Phase 2: 启动验证
+
+### 2.1 重启 Gateway
+
+```bash
+# 重启 OpenClaw Gateway
 openclaw gateway restart
 
-# 3. 检查插件是否加载
-openclaw gateway logs | grep -i reflection
+# 或前台启动查看日志
+openclaw gateway --verbose
 ```
 
-### 2.2 预期日志输出
+### 2.2 验证插件加载
 
+查看 Gateway 日志，确认插件已加载：
+
+```bash
+# 查看 Gateway 日志（macOS）
+tail -f ~/Library/Logs/openclaw/gateway.log
+
+# 或使用 openclaw 命令
+openclaw gateway health
 ```
-[2024-03-04T10:00:00.000Z] [info] [Plugin] Reflection plugin registered
-[2024-03-04T10:00:00.001Z] [info] [Plugin] bufferSize: 50, sessionTTL: 300000, logLevel: debug
-[2024-03-04T10:00:00.002Z] [info] [Plugin] Hooks registered successfully
+
+**预期输出：**
+```
+[info] Plugin loaded: reflection-plugin
+[info] Reflection plugin registered
+[info] bufferSize: 50, sessionTTL: 300000, logLevel: debug
+[info] Hooks registered successfully
+```
+
+### 2.3 验证配置生效
+
+检查配置是否正确传入：
+
+```bash
+# 查看 Gateway 配置
+openclaw gateway call config.get '{"key": "plugins"}'
 ```
 
 ---
@@ -147,18 +182,17 @@ openclaw gateway logs | grep -i reflection
 3. 验证 buffer 和日志
 
 **发送测试消息：**
-```bash
-# 通过 Telegram/Discord 发送: "测试消息 123"
+```
+用户: 测试消息 123
 ```
 
-**验证 Buffer：**
-```bash
-# 方法1: 通过插件暴露的 tool（如果实现）
-# 需要在 plugin 中注册 tool
+**验证日志：**
 
-# 方法2: 直接查看日志
-ls -la logs/
-cat logs/reflection-$(date +%Y-%m-%d).log | jq .
+插件日志文件位置：`/Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin/logs/reflection-YYYY-MM-DD.log`
+
+```bash
+# 查看最新日志
+tail -20 logs/reflection-$(date +%Y-%m-%d).log | jq .
 ```
 
 **预期日志条目：**
@@ -202,9 +236,27 @@ cat logs/reflection-$(date +%Y-%m-%d).log | jq .
 
 ### 场景 B: 缓冲区定长验证
 
-**配置：**
-```yaml
-bufferSize: 3  # 故意设小，方便观察驱逐
+**修改配置：**
+```json
+{
+  "plugins": {
+    "entries": {
+      "reflection-plugin": {
+        "enabled": true,
+        "config": {
+          "bufferSize": 3,
+          "sessionTTL": 300000,
+          "logLevel": "debug"
+        }
+      }
+    },
+    "load": {
+      "paths": [
+        "/Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin"
+      ]
+    }
+  }
+}
 ```
 
 **步骤：**
@@ -233,16 +285,29 @@ cat logs/reflection-$(date +%Y-%m-%d).log | grep "Evicted oldest message"
 
 ### 场景 C: Session TTL 清理
 
-**配置：**
-```yaml
-sessionTTL: 10000  # 10秒，方便测试
+**修改配置：**
+```json
+{
+  "plugins": {
+    "entries": {
+      "reflection-plugin": {
+        "enabled": true,
+        "config": {
+          "bufferSize": 50,
+          "sessionTTL": 10000,
+          "logLevel": "debug"
+        }
+      }
+    }
+  }
+}
 ```
 
 **步骤：**
 1. 重启 Gateway
 2. 发送消息建立 session
-3. 等待 10+ 秒
-4. 触发 cleanup（发送新消息或等待定时任务）
+3. 等待 10+ 秒（不发送新消息）
+4. 发送新消息触发 cleanup
 5. 验证 session 被清理
 
 **预期日志：**
@@ -253,7 +318,8 @@ sessionTTL: 10000  # 10秒，方便测试
   "component": "SessionBufferManager",
   "event": "Expired session cleaned up",
   "details": {
-    "sessionKey": "..."
+    "sessionKey": "...",
+    "cleanedCount": 1
   }
 }
 ```
@@ -262,7 +328,7 @@ sessionTTL: 10000  # 10秒，方便测试
 
 **步骤：**
 1. 正常对话几轮
-2. 使用 `/reset` 或结束会话
+2. 使用 `/reset` 或 `/new` 结束会话
 3. 验证 buffer 被清理
 
 **预期日志：**
@@ -321,34 +387,11 @@ echo "=== Buffer Operations ==="
 cat "$LOG_FILE" | jq 'select(.event | contains("pushed") or contains("evicted")) | {timestamp, event, details}'
 ```
 
-### 4.2 Buffer 状态查询（需要 Plugin 支持）
-
-扩展 plugin 暴露查询 API：
-
-```typescript
-// index.ts
-export function register(api: PluginAPI): void {
-  // ... 现有代码 ...
-  
-  // 暴露查询接口（如果 Plugin API 支持）
-  if (api.registerTool) {
-    api.registerTool('reflection.getBuffer', {
-      handler: async (params: { sessionKey?: string }) => {
-        const key = params.sessionKey ?? 'current';
-        return {
-          sessionKey: key,
-          messageCount: bufferManager?.getMessages(key).length ?? 0,
-          messages: bufferManager?.getMessages(key) ?? [],
-        };
-      },
-    });
-  }
-}
-```
-
-### 4.3 实时监控命令
+### 4.2 实时监控命令
 
 ```bash
+cd /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin
+
 # 实时查看日志
 tail -f logs/reflection-$(date +%Y-%m-%d).log | jq .
 
@@ -357,6 +400,9 @@ tail -f logs/reflection-$(date +%Y-%m-%d).log | jq 'select(.sessionKey == "main:
 
 # 统计消息数量
 cat logs/reflection-$(date +%Y-%m-%d).log | jq -s 'group_by(.sessionKey) | map({session: .[0].sessionKey, count: length})'
+
+# 查看特定级别以上的日志
+cat logs/reflection-$(date +%Y-%m-%d).log | jq 'select(.level == "info" or .level == "warn" or .level == "error")'
 ```
 
 ---
@@ -367,14 +413,46 @@ cat logs/reflection-$(date +%Y-%m-%d).log | jq -s 'group_by(.sessionKey) | map({
 
 **检查清单：**
 1. Gateway 是否重启？
-2. 插件路径是否正确？
-3. `openclaw.plugin.json` 是否存在？
+2. `openclaw.plugin.json` 中的 `id` 是否与 `openclaw.json` 中的 key 匹配？
+3. `plugins.load.paths` 路径是否正确？
 4. `dist/index.js` 是否已构建？
 
 **调试命令：**
 ```bash
-openclaw gateway logs --follow
-openclaw plugins list  # 如果有此命令
+# 查看 Gateway 启动日志
+openclaw gateway --verbose
+
+# 检查插件配置
+openclaw config get plugins
+
+# 验证文件存在
+ls -la /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin/dist/index.js
+ls -la /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin/openclaw.plugin.json
+```
+
+### 问题：配置未生效
+
+**检查清单：**
+1. `plugins.entries.<id>.config` 中的配置项名称是否正确？
+2. 配置值类型是否符合 `configSchema`？
+3. 是否重启了 Gateway？
+
+**修复示例：**
+```json
+{
+  "plugins": {
+    "entries": {
+      "reflection-plugin": {
+        "enabled": true,
+        "config": {
+          "bufferSize": 50,
+          "sessionTTL": 300000,
+          "logLevel": "debug"
+        }
+      }
+    }
+  }
+}
 ```
 
 ### 问题：Hook 未触发
@@ -382,17 +460,28 @@ openclaw plugins list  # 如果有此命令
 **检查清单：**
 1. Gateway 版本是否支持 hooks？
 2. Hook 名称是否正确？(`message:received`, `message:sent`)
-3. 事件格式是否匹配？
+3. 插件是否成功注册？查看 `register()` 是否执行
+
+**调试：**
+在 `index.ts` 中添加调试日志：
+```typescript
+console.log('[Reflection] Registering hooks...');
+api.hooks.on('message:received', (event) => {
+  console.log('[Reflection] Received event:', event);
+  // ...
+});
+```
 
 ### 问题：日志未写入
 
 **检查清单：**
 1. 插件目录是否有写权限？
 2. `logs/` 目录是否被创建？
-3. logLevel 是否设为 `debug`？
+3. `logLevel` 是否设为 `debug`？
 
 **修复：**
 ```bash
+cd /Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin
 mkdir -p logs
 chmod 755 logs
 ```
@@ -410,7 +499,7 @@ chmod 755 logs
 
 | 检查项 | 状态 | 验证方式 |
 |--------|------|----------|
-| Gateway 启动无报错 | ⬜ | `openclaw gateway logs` |
+| Gateway 启动无报错 | ⬜ | `openclaw gateway --verbose` |
 | Plugin 成功注册 | ⬜ | 日志中出现 "Reflection plugin registered" |
 | 收到用户消息 | ⬜ | 日志中出现 "Message received" |
 | AI 回复被记录 | ⬜ | 日志中出现 "Message sent" |
@@ -474,4 +563,44 @@ chmod 755 logs
 
 ---
 
-*E2E Plan by Lia* 🌸
+## 附录：配置参考
+
+### 完整 openclaw.json 示例
+
+```json
+{
+  "gateway": {
+    "port": 18789,
+    "mode": "local"
+  },
+  "plugins": {
+    "entries": {
+      "reflection-plugin": {
+        "enabled": true,
+        "config": {
+          "bufferSize": 100,
+          "sessionTTL": 3600000,
+          "logLevel": "info"
+        }
+      }
+    },
+    "load": {
+      "paths": [
+        "/Users/dnq/.openclaw/workspace/repo/openclaw-reflection-plugin"
+      ]
+    }
+  }
+}
+```
+
+### 配置项说明
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `bufferSize` | integer | 100 | 每个会话的缓冲区大小 |
+| `sessionTTL` | integer | 3600000 | Session 过期时间（毫秒） |
+| `logLevel` | string | "info" | 日志级别：debug/info/warn/error |
+
+---
+
+*E2E Plan v2.0 by Lia* 🌸
