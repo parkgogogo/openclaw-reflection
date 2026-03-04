@@ -3,13 +3,9 @@
   "version": "1.0.0",
   "description": "OpenClaw plugin for capturing and storing conversation messages in a circular buffer",
   "type": "module",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "src/index.ts",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "clean": "rm -rf dist logs"
+    "clean": "rm -rf logs"
   },
   "keywords": [
     "openclaw",
@@ -19,11 +15,15 @@
   ],
   "author": "",
   "license": "MIT",
+  "openclaw": {
+    "extensions": [
+      "openclaw.plugin.json"
+    ]
+  },
   "dependencies": {
     "ulid": "^2.3.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "@types/node": "^20.0.0"
   }
 }

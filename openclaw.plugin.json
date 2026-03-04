@@ -1,5 +1,6 @@
 {
   "id": "reflection-plugin",
+  "entry": "src/index.ts",
   "configSchema": {
     "type": "object",
     "properties": {
