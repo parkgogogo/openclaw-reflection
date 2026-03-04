@@ -65,7 +65,7 @@ class CombinedLogger implements Logger {
   }
 }
 
-export function activate(api: PluginAPI): void {
+export default function activate(api: PluginAPI): void {
   if (isRegistered) {
     gatewayLogger?.warn('[Reflection] register called more than once, skipping duplicate registration');
     return;
