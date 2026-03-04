@@ -1,6 +1,6 @@
-import type { SessionBufferManager } from './session-manager.js';
-import type { Logger, ReflectionMessage } from './types.js';
-import { ulid } from 'ulid';
+import type { SessionBufferManager } from "./session-manager.js";
+import type { Logger, ReflectionMessage } from "./types.js";
+import { ulid } from "ulid";
 
 interface MessageEvent {
   message?: {
@@ -11,75 +11,218 @@ interface MessageEvent {
   };
   content?: string;
   text?: string;
+  from?: string;
+  to?: string;
+  success?: boolean;
   sessionKey?: string;
+  sessionId?: string;
+  conversationId?: string;
+  accountId?: string;
   channelId?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === "object" && value !== null;
 }
 
-function normalizeMessageEvent(event: unknown): MessageEvent {
-  if (!isRecord(event)) {
-    return {};
+function getNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
   }
 
-  const rawMessage = isRecord(event.message) ? event.message : undefined;
-  
+  const trimmed = value.trim();
+  return trimmed !== "" ? trimmed : undefined;
+}
+
+function toRecord(value: unknown): Record<string, unknown> | undefined {
+  return isRecord(value) ? value : undefined;
+}
+
+function buildConversationSessionKey(event: MessageEvent): string | null {
+  if (!event.conversationId) {
+    return null;
+  }
+
+  const channelId = event.channelId ?? "unknown";
+  const accountId = event.accountId ?? "default";
+  return `conv:${channelId}:${accountId}:${event.conversationId}`;
+}
+
+function normalizeMessageEvent(event: unknown, hookContext?: unknown): MessageEvent {
+  if (!isRecord(event)) {
+    const contextRecord = toRecord(hookContext);
+    return {
+      sessionKey: getNonEmptyString(contextRecord?.sessionKey),
+      sessionId: getNonEmptyString(contextRecord?.sessionId),
+      channelId: getNonEmptyString(contextRecord?.channelId),
+      conversationId: getNonEmptyString(contextRecord?.conversationId),
+      accountId: getNonEmptyString(contextRecord?.accountId),
+    };
+  }
+
+  const rawMessage = toRecord(event.message);
+  const rawEventContext = toRecord(event.context);
+  const rawHookContext = toRecord(hookContext);
+  const rawContext = rawEventContext ?? rawHookContext;
+  const rawSession = toRecord(event.session);
+  const rawMetadata = toRecord(event.metadata);
+
   // Get content from either message.content, message.text, event.content, or event.text
-  const content = rawMessage 
-    ? (typeof rawMessage.content === 'string' ? rawMessage.content : typeof rawMessage.text === 'string' ? rawMessage.text : undefined)
-    : (typeof event.content === 'string' ? event.content : typeof event.text === 'string' ? event.text : undefined);
+  const content = rawMessage
+    ? getNonEmptyString(rawMessage.content) ??
+      getNonEmptyString(rawMessage.text)
+    : getNonEmptyString(event.content) ??
+      getNonEmptyString(event.text) ??
+      getNonEmptyString(event.bodyForAgent) ??
+      getNonEmptyString(event.body) ??
+      getNonEmptyString(rawContext?.content) ??
+      getNonEmptyString(rawContext?.text) ??
+      getNonEmptyString(event.transcript);
+
+  const sessionKey =
+    getNonEmptyString(event.sessionKey) ??
+    getNonEmptyString(rawContext?.sessionKey) ??
+    getNonEmptyString(rawSession?.key);
+
+  const sessionId =
+    getNonEmptyString(event.sessionId) ??
+    getNonEmptyString(rawContext?.sessionId) ??
+    getNonEmptyString(rawSession?.id);
+
+  const channelId =
+    getNonEmptyString(event.channelId) ??
+    getNonEmptyString(rawContext?.channelId) ??
+    getNonEmptyString(rawMetadata?.channelId);
+
+  const conversationId =
+    getNonEmptyString(event.conversationId) ??
+    getNonEmptyString(rawContext?.conversationId);
+
+  const accountId =
+    getNonEmptyString(event.accountId) ??
+    getNonEmptyString(rawContext?.accountId);
+
+  const from =
+    getNonEmptyString(event.from) ??
+    getNonEmptyString(rawMetadata?.from) ??
+    getNonEmptyString(rawContext?.from);
+
+  const to =
+    getNonEmptyString(event.to) ??
+    getNonEmptyString(rawMetadata?.to) ??
+    getNonEmptyString(rawContext?.to);
+
+  const success =
+    typeof event.success === "boolean"
+      ? event.success
+      : typeof rawMetadata?.success === "boolean"
+      ? rawMetadata.success
+      : undefined;
+
+  const messageId =
+    getNonEmptyString(rawMessage?.id) ??
+    getNonEmptyString(rawContext?.messageId) ??
+    getNonEmptyString(rawMetadata?.messageId);
+
+  const messageChannelId =
+    getNonEmptyString(rawMessage?.channelId) ??
+    getNonEmptyString(rawContext?.channelId) ??
+    getNonEmptyString(rawMetadata?.channelId);
 
   return {
-    sessionKey: typeof event.sessionKey === 'string' && event.sessionKey.trim() !== '' ? event.sessionKey : undefined,
-    channelId: typeof event.channelId === 'string' && event.channelId.trim() !== '' ? event.channelId : undefined,
-    message: content !== undefined
-      ? {
-          id: rawMessage && typeof rawMessage.id === 'string' ? rawMessage.id : undefined,
-          content,
-          channelId: rawMessage && typeof rawMessage.channelId === 'string' ? rawMessage.channelId : undefined,
-        }
-      : undefined,
+    sessionKey,
+    sessionId,
+    conversationId,
+    accountId,
+    from,
+    to,
+    success,
+    channelId,
+    message:
+      content !== undefined
+        ? {
+            id: messageId,
+            content,
+            channelId: messageChannelId,
+          }
+        : undefined,
   };
 }
 
-function resolveSessionKey(event: MessageEvent, logger: Logger, hookName: string): string | null {
+function resolveSessionKey(
+  event: MessageEvent,
+  logger: Logger,
+  hookName: string
+): string | null {
   if (event.sessionKey) {
     return event.sessionKey;
   }
 
-  logger.warn('MessageHandler', 'Skip event without sessionKey', { hookName });
+  if (event.sessionId) {
+    logger.warn("MessageHandler", "SessionKey missing, fallback to sessionId", {
+      hookName,
+      sessionId: event.sessionId,
+    });
+    return event.sessionId;
+  }
+
+  const conversationSessionKey = buildConversationSessionKey(event);
+  if (conversationSessionKey) {
+    logger.info("MessageHandler", "SessionKey missing, fallback to conversationId", {
+      hookName,
+      conversationId: event.conversationId,
+      channelId: event.channelId,
+      accountId: event.accountId,
+      derivedSessionKey: conversationSessionKey,
+    });
+    return conversationSessionKey;
+  }
+
+  logger.warn("MessageHandler", "Skip event without sessionKey", { hookName });
   return null;
 }
 
 function resolveChannelId(event: MessageEvent): string {
-  return event.channelId ?? event.message?.channelId ?? 'unknown';
+  return event.channelId ?? event.message?.channelId ?? "unknown";
 }
 
 function createReflectionMessage(
   event: MessageEvent,
-  role: 'user' | 'assistant',
+  role: "user" | "agent",
   sessionKey: string,
   channelId: string
 ): ReflectionMessage {
+  const metadata: ReflectionMessage["metadata"] = {
+    messageId: event.message?.id,
+    from: event.from,
+    to: event.to,
+    success: event.success,
+  };
+
   return {
     id: ulid(),
     role,
-    content: event.message?.content ?? '',
+    message: event.message?.content ?? "",
     timestamp: Date.now(),
     sessionKey,
     channelId,
-    metadata: {
-      messageId: event.message?.id,
-    },
+    metadata,
   };
 }
 
 // index.ts passes FileLogger here; handlers should only use this injected logger.
-export function handleMessageReceived(event: unknown, bufferManager: SessionBufferManager, logger: Logger): void {
-  const normalizedEvent = normalizeMessageEvent(event);
-  const sessionKey = resolveSessionKey(normalizedEvent, logger, 'message:received');
+export function handleMessageReceived(
+  event: unknown,
+  bufferManager: SessionBufferManager,
+  logger: Logger,
+  hookContext?: unknown
+): void {
+  const normalizedEvent = normalizeMessageEvent(event, hookContext);
+  const sessionKey = resolveSessionKey(
+    normalizedEvent,
+    logger,
+    "message:received"
+  );
 
   if (!sessionKey) {
     return;
@@ -87,26 +230,34 @@ export function handleMessageReceived(event: unknown, bufferManager: SessionBuff
 
   const channelId = resolveChannelId(normalizedEvent);
 
-  logger.debug(
-    'MessageHandler',
-    'Message received',
+  const message = createReflectionMessage(
+    normalizedEvent,
+    "user",
+    sessionKey,
+    channelId
+  );
+
+  logger.info(
+    "MessageHandler",
+    "Buffer message snapshot",
     {
-      sessionKey,
-      channelId,
-      hasContent: !!normalizedEvent.message?.content,
+      hookName: "message:received",
+      bufferMessage: message,
     },
     sessionKey
   );
 
-  const message = createReflectionMessage(normalizedEvent, 'user', sessionKey, channelId);
   bufferManager.push(sessionKey, message);
-
-  logger.debug('MessageHandler', 'User message stored', { messageId: message.id }, sessionKey);
 }
 
-export function handleMessageSent(event: unknown, bufferManager: SessionBufferManager, logger: Logger): void {
-  const normalizedEvent = normalizeMessageEvent(event);
-  const sessionKey = resolveSessionKey(normalizedEvent, logger, 'message:sent');
+export function handleMessageSent(
+  event: unknown,
+  bufferManager: SessionBufferManager,
+  logger: Logger,
+  hookContext?: unknown
+): void {
+  const normalizedEvent = normalizeMessageEvent(event, hookContext);
+  const sessionKey = resolveSessionKey(normalizedEvent, logger, "message:sent");
 
   if (!sessionKey) {
     return;
@@ -114,31 +265,45 @@ export function handleMessageSent(event: unknown, bufferManager: SessionBufferMa
 
   const channelId = resolveChannelId(normalizedEvent);
 
-  logger.debug(
-    'MessageHandler',
-    'Message sent',
+  const message = createReflectionMessage(
+    normalizedEvent,
+    "agent",
+    sessionKey,
+    channelId
+  );
+
+  logger.info(
+    "MessageHandler",
+    "Buffer message snapshot",
     {
-      sessionKey,
-      channelId,
-      hasContent: !!normalizedEvent.message?.content,
+      hookName: "message:sent",
+      bufferMessage: message,
     },
     sessionKey
   );
 
-  const message = createReflectionMessage(normalizedEvent, 'assistant', sessionKey, channelId);
   bufferManager.push(sessionKey, message);
-
-  logger.debug('MessageHandler', 'Assistant message stored', { messageId: message.id }, sessionKey);
 }
 
-export function handleSessionEnd(event: unknown, bufferManager: SessionBufferManager, logger: Logger): void {
-  const normalizedEvent = normalizeMessageEvent(event);
-  const sessionKey = resolveSessionKey(normalizedEvent, logger, 'session:end');
+export function handleSessionEnd(
+  event: unknown,
+  bufferManager: SessionBufferManager,
+  logger: Logger,
+  hookName = "session:end",
+  hookContext?: unknown
+): void {
+  const normalizedEvent = normalizeMessageEvent(event, hookContext);
+  const sessionKey = resolveSessionKey(normalizedEvent, logger, hookName);
 
   if (!sessionKey) {
     return;
   }
 
-  logger.info('MessageHandler', 'Session ended, clearing buffer', { sessionKey }, sessionKey);
+  logger.info(
+    "MessageHandler",
+    "Session cleared by lifecycle command/hook",
+    { sessionKey, hookName },
+    sessionKey
+  );
   bufferManager.clearSession(sessionKey);
 }

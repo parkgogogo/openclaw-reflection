@@ -9,8 +9,8 @@ export interface Logger {
 
 export interface ReflectionMessage {
   id: string;
-  role: 'user' | 'assistant';
-  content: string;
+  role: 'user' | 'agent';
+  message: string;
   timestamp: number;
   sessionKey: string;
   channelId: string;

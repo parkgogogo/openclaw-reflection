@@ -1,4 +1,4 @@
-import type { LogLevel, PluginConfig } from './types.js';
+import type { LogLevel, PluginConfig } from "./types.js";
 
 interface PluginAPI {
   config?: {
@@ -8,13 +8,13 @@ interface PluginAPI {
 
 const DEFAULT_CONFIG: PluginConfig = {
   bufferSize: 100,
-  logLevel: 'info',
+  logLevel: "info",
 };
 
-const VALID_LOG_LEVELS = new Set<LogLevel>(['debug', 'info', 'warn', 'error']);
+const VALID_LOG_LEVELS = new Set<LogLevel>(["debug", "info", "warn", "error"]);
 
 function getPositiveInteger(value: unknown, fallback: number): number {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
     return fallback;
   }
 
@@ -22,7 +22,7 @@ function getPositiveInteger(value: unknown, fallback: number): number {
 }
 
 function getLogLevel(value: unknown): LogLevel {
-  if (typeof value === 'string' && VALID_LOG_LEVELS.has(value as LogLevel)) {
+  if (typeof value === "string" && VALID_LOG_LEVELS.has(value as LogLevel)) {
     return value as LogLevel;
   }
 
@@ -33,7 +33,10 @@ export function parseConfig(api: PluginAPI): PluginConfig {
   const config = api.config ?? {};
 
   return {
-    bufferSize: getPositiveInteger(config.get?.('bufferSize'), DEFAULT_CONFIG.bufferSize),
-    logLevel: getLogLevel(config.get?.('logLevel')),
+    bufferSize: getPositiveInteger(
+      config.get?.("bufferSize"),
+      DEFAULT_CONFIG.bufferSize
+    ),
+    logLevel: getLogLevel(config.get?.("logLevel")),
   };
 }
