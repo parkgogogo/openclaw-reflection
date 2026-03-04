@@ -76,6 +76,7 @@ function createReflectionMessage(
   };
 }
 
+// index.ts passes FileLogger here; handlers should only use this injected logger.
 export function handleMessageReceived(event: unknown, bufferManager: SessionBufferManager, logger: Logger): void {
   const normalizedEvent = normalizeMessageEvent(event);
   const sessionKey = resolveSessionKey(normalizedEvent, logger, 'message:received');

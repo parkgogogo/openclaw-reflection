@@ -186,7 +186,7 @@ api.registerHook('session:end', async (event) => {
 
 - Gateway Logger (`api.logger`): 仅在 `src/index.ts` 记录插件生命周期（启动、配置加载、初始化完成、hook 注册完成、重复注册保护）。
 - FileLogger (`src/logger.ts`): 记录所有详细事件（`message:received` / `message:sent` / `session:end` 的处理细节、SessionBufferManager 的缓冲区行为）。
-- 不再使用组合型 logger（CombinedLogger）；业务代码统一依赖 `FileLogger` 对外提供的 `Logger` 接口。
+- 业务代码统一依赖 `FileLogger` 对外提供的 `Logger` 接口，避免入口层引入额外日志包装。
 
 ### 日志级别
 
