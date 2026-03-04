@@ -1,0 +1,21 @@
+{
+  "id": "reflection-plugin",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "bufferSize": {
+        "type": "number",
+        "default": 100
+      },
+      "sessionTTL": {
+        "type": "number",
+        "default": 3600000
+      },
+      "logLevel": {
+        "type": "string",
+        "enum": ["debug", "info", "warn", "error"],
+        "default": "info"
+      }
+    }
+  }
+}
