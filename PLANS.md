@@ -101,27 +101,6 @@ api.registerHook('message:sent', (event) => {
 
 ---
 
-### 备选方案（已排除）
-
-#### 方式 B：通过 Session Store 读取历史
-
-OpenClaw 的会话数据存储在：
-- **SQLite 数据库**：`~/.openclaw/sessions.db`
-- **JSONL 转录文件**：`~/.openclaw/agents/<agentId>/sessions/*.jsonl`
-
-**排除原因：**
-- Plugin 访问这些存储需要额外的内部 API，不如 Hooks 实时
-- 需要轮询或定时读取，效率低下
-- 实现复杂度更高
-
-#### 方式 C：通过 sessions_history 工具
-
-**排除原因：**
-- 这是 Agent 层面的工具，Plugin 直接调用方式不明确
-- 需要额外处理权限和上下文传递
-
----
-
 ## 架构方案
 
 ```
