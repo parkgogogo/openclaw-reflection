@@ -223,14 +223,28 @@ interface LogEntry {
 
 ### Logger 实现
 
+日志写入插件根目录下的 `logs/` 文件夹：
+
 ```typescript
 // logger.ts
+import { appendFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
+
 class Logger {
   private level: number;
+  private logDir: string;
+  private logFile: string;
   private levels = { debug: 0, info: 1, warn: 2, error: 3 };
 
-  constructor(level: string = 'info') {
+  constructor(pluginRootDir: string, level: string = 'info') {
     this.level = this.levels[level as keyof typeof this.levels] ?? 1;
+    this.logDir = join(pluginRootDir, 'logs');
+    this.logFile = join(this.logDir, `reflection-${new Date().toISOString().split('T')[0]}.log`);
+    
+    // 确保日志目录存在
+    if (!existsSync(this.logDir)) {
+      mkdirSync(this.logDir, { recursive: true });
+    }
   }
 
   private log(
@@ -251,8 +265,14 @@ class Logger {
       ...(sessionKey && { sessionKey }),
     };
 
-    // 输出到 Gateway 日志系统
-    console.log(JSON.stringify(entry));
+    // 写入文件（同步追加）
+    const line = JSON.stringify(entry) + '\n';
+    try {
+      appendFileSync(this.logFile, line);
+    } catch (err) {
+      // 兜底：如果文件写入失败，输出到 stderr
+      console.error('[ReflectionPlugin] Failed to write log:', err);
+    }
   }
 
   debug(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string) {
@@ -270,6 +290,52 @@ class Logger {
   error(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string) {
     this.log('error', component, event, details, sessionKey);
   }
+
+  // 获取当前日志文件路径
+  getLogFile(): string {
+    return this.logFile;
+  }
+}
+```
+
+### 日志文件结构
+
+```
+openclaw-reflection-plugin/
+├── logs/
+│   ├── reflection-2024-03-04.log    # 按日期分片
+│   ├── reflection-2024-03-05.log
+│   └── ...
+├── openclaw.plugin.json
+└── ...
+```
+
+### 日志轮转策略
+
+```typescript
+// 简单的日志轮转：按天自动切换文件
+private rotateIfNeeded(): void {
+  const today = new Date().toISOString().split('T')[0];
+  const expectedFile = join(this.logDir, `reflection-${today}.log`);
+  
+  if (this.logFile !== expectedFile) {
+    this.logFile = expectedFile;
+  }
+}
+```
+
+### 获取插件根目录
+
+在 register 函数中获取插件目录：
+
+```typescript
+export default function register(api: OpenClawPluginApi) {
+  // 通过 api 获取插件配置目录
+  const pluginDir = api.pluginDir ?? process.cwd();
+  
+  const logger = new Logger(pluginDir, api.pluginConfig?.logLevel ?? 'info');
+  
+  // ... 后续初始化
 }
 ```
 
@@ -325,20 +391,29 @@ class Logger {
 
 ```
 openclaw-reflection-plugin/
-├── openclaw.plugin.json      # 插件清单
-├── package.json              # npm 配置
+├── logs/                       # 日志目录（自动创建，已添加到 .gitignore）
+│   └── reflection-YYYY-MM-DD.log
+├── openclaw.plugin.json        # 插件清单
+├── package.json                # npm 配置
+├── .gitignore                  # 忽略 logs/
 ├── src/
-│   ├── index.ts              # 入口：register 函数
-│   ├── buffer.ts             # CircularBuffer 实现
-│   ├── session-manager.ts    # SessionBufferManager
-│   ├── message-handler.ts    # Hook 处理逻辑
-│   ├── logger.ts             # 日志模块
-│   ├── types.ts              # TypeScript 类型定义
-│   └── config.ts             # 配置解析
+│   ├── index.ts                # 入口：register 函数
+│   ├── buffer.ts               # CircularBuffer 实现
+│   ├── session-manager.ts      # SessionBufferManager
+│   ├── message-handler.ts      # Hook 处理逻辑
+│   ├── logger.ts               # 日志模块
+│   ├── types.ts                # TypeScript 类型定义
+│   └── config.ts               # 配置解析
 ├── tests/
-│   ├── buffer.test.ts        # 缓冲区单元测试
-│   └── integration.test.ts   # 集成测试
-└── IMPL.md                   # 本文件
+│   ├── buffer.test.ts          # 缓冲区单元测试
+│   └── integration.test.ts     # 集成测试
+└── IMPL.md                     # 本文件
+```
+
+**`.gitignore`**
+```
+logs/
+*.log
 ```
 
 ---
