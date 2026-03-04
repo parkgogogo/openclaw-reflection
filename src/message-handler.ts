@@ -1,6 +1,5 @@
 import type { SessionBufferManager } from './session-manager.js';
-import type { Logger } from './logger.js';
-import type { ReflectionMessage } from './types.js';
+import type { Logger, ReflectionMessage } from './types.js';
 import { ulid } from 'ulid';
 
 interface MessageEvent {

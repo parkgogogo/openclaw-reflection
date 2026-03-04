@@ -1,6 +1,5 @@
 import { CircularBuffer } from './buffer.js';
-import { Logger } from './logger.js';
-import type { ReflectionMessage } from './types.js';
+import type { Logger, ReflectionMessage } from './types.js';
 
 interface SessionData {
   buffer: CircularBuffer<ReflectionMessage>;
