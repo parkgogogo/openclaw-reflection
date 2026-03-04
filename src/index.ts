@@ -20,7 +20,7 @@ interface PluginAPI {
     get?: (key: string) => unknown;
   };
   logger: PluginLogger;
-  registerHook: (event: string, handler: (event: unknown) => void) => void;
+  registerHook: (event: string, handler: (event: unknown) => void, options?: { name?: string }) => void;
 }
 
 let bufferManager: SessionBufferManager | null = null;
@@ -104,19 +104,19 @@ export default function activate(api: PluginAPI): void {
     if (bufferManager) {
       handleMessageReceived(event, bufferManager, logger);
     }
-  });
+  }, { name: 'reflection-message-received' });
 
   api.registerHook('message:sent', (event: unknown) => {
     if (bufferManager) {
       handleMessageSent(event, bufferManager, logger);
     }
-  });
+  }, { name: 'reflection-message-sent' });
 
   api.registerHook('session:end', (event: unknown) => {
     if (bufferManager) {
       handleSessionEnd(event, bufferManager, logger);
     }
-  });
+  }, { name: 'reflection-session-end' });
 
   isRegistered = true;
   gatewayLogger.info('[Reflection] Plugin registered successfully, all hooks active');
