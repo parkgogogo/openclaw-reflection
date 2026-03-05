@@ -111,7 +111,7 @@ soulWriter.write(
 
 ## 核心 Prompt
 
-见 `../prompts/soul-writer.md`
+见 `../prompts/semantic-writer.md`
 
 简化版：
 
@@ -387,7 +387,7 @@ Be helpful
 ## 代码结构
 
 ```typescript
-class SoulWriter {
+class SemanticWriter {
   private llm: LLMClient;
   private logger: Logger;
 

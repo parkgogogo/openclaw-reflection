@@ -13,9 +13,9 @@ docs/
 │   └── 2026-03-05-soul-reshaper-design.md
 ├── prompts/                           # 🎯 Prompt 设计
 │   ├── conversation-analysis.md       # 对话分析 Prompt
-│   └── soul-writer.md                 # 文件写入 Prompt
+│   └── semantic-writer.md             # 语义写入 Prompt
 ├── design/                            # 🔧 核心机制设计
-│   └── soul-writer.md                 # 统一写入器设计
+│   └── semantic-writer.md             # 语义写入器设计
 └── archive/                           # 📦 历史版本归档
     ├── conversation-analysis-prompt.md
     ├── conversation-analysis-prompt-v2.md
@@ -45,8 +45,8 @@ docs/
 - 置信度评估
 - 关系理解
 
-### 3. 文件写入 Prompt
-**文件**: `prompts/soul-writer.md`
+### 3. 语义写入 Prompt
+**文件**: `prompts/semantic-writer.md`
 
 **内容**:
 - 语义整合策略
@@ -54,8 +54,8 @@ docs/
 - 优雅处理演变
 - 去重与结构保持
 
-### 4. 统一写入器设计
-**文件**: `design/soul-writer.md`
+### 4. 语义写入器设计
+**文件**: `design/semantic-writer.md`
 
 **内容**:
 - 统一 `write()` 接口
@@ -79,7 +79,7 @@ docs/
    - ✅ 写入机制设计
 
 3. **Implement** (下一步)
-   - SoulWriter 类实现
+   - SemanticWriter 类实现
    - 集成到 Reflection Plugin
    - 测试与调优
 
