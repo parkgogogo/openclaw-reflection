@@ -111,7 +111,9 @@ soulWriter.write(
 
 ## 核心 Prompt
 
-一个统一的 Prompt，处理所有写入场景：
+见 `../prompts/soul-writer.md`
+
+简化版：
 
 ```markdown
 You are a semantic file writer. Your task is to integrate new content into an existing file.

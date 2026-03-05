@@ -12,9 +12,10 @@ docs/
 ├── plans/                             # 📋 系统设计文档
 │   └── 2026-03-05-soul-reshaper-design.md
 ├── prompts/                           # 🎯 Prompt 设计
-│   └── conversation-analysis.md       # 对话分析 Prompt
+│   ├── conversation-analysis.md       # 对话分析 Prompt
+│   └── soul-writer.md                 # 文件写入 Prompt
 ├── design/                            # 🔧 核心机制设计
-│   └── soul-writer.md                 # 统一写入器
+│   └── soul-writer.md                 # 统一写入器设计
 └── archive/                           # 📦 历史版本归档
     ├── conversation-analysis-prompt.md
     ├── conversation-analysis-prompt-v2.md
@@ -44,14 +45,23 @@ docs/
 - 置信度评估
 - 关系理解
 
-### 3. 统一写入器设计
+### 3. 文件写入 Prompt
+**文件**: `prompts/soul-writer.md`
+
+**内容**:
+- 语义整合策略
+- 冲突解决：新事实 > 旧事实
+- 优雅处理演变
+- 去重与结构保持
+
+### 4. 统一写入器设计
 **文件**: `design/soul-writer.md`
 
 **内容**:
 - 统一 `write()` 接口
-- LLM 语义整合（新/更新/冲突/重复）
-- 事实冲突解决：新 > 旧
-- 优雅演进策略
+- LLM 语义整合流程
+- 压缩机制
+- 代码结构
 
 ---
 
