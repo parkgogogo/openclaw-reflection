@@ -53,7 +53,6 @@ export interface LogEntry {
 
 export type MemoryDecision =
   | "NO_WRITE"
-  | "WRITE_DAILY"
   | "UPDATE_MEMORY"
   | "UPDATE_USER"
   | "UPDATE_SOUL"
@@ -71,24 +70,22 @@ export interface MemoryGateConfig {
   model: string;
 }
 
-export interface DailyWriterConfig {
-  enabled: boolean;
-  memoryDir: string;
-}
-
 export interface ConsolidationConfig {
   enabled: boolean;
   schedule: string;
-  minDailyEntries: number;
 }
 
 export interface PluginConfig {
   bufferSize: number;
   logLevel: LogLevel;
   memoryGate: MemoryGateConfig;
-  dailyWriter: DailyWriterConfig;
   consolidation: ConsolidationConfig;
 }
 
 export type { LLMClient, MemoryGateInput } from "./memory-gate/types.js";
-export type { ConsolidationResult, DailyEntry } from "./consolidation/types.js";
+export type {
+  ConsolidatedFilename,
+  ConsolidationPatch,
+  ConsolidationProposal,
+  ConsolidationResult,
+} from "./consolidation/types.js";

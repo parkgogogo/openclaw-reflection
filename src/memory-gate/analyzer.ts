@@ -9,7 +9,6 @@ import type {
 
 const VALID_DECISIONS: ReadonlySet<MemoryDecision> = new Set([
   "NO_WRITE",
-  "WRITE_DAILY",
   "UPDATE_MEMORY",
   "UPDATE_USER",
   "UPDATE_SOUL",

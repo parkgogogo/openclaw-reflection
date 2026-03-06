@@ -2,7 +2,6 @@ import * as path from "path";
 import * as url from "url";
 import { parseConfig } from "./config.js";
 import { ConsolidationScheduler } from "./consolidation/index.js";
-import { DailyWriter } from "./daily-writer/index.js";
 import { FileCurator } from "./file-curator/index.js";
 import { FileLogger } from "./logger.js";
 import {
@@ -124,15 +123,37 @@ function createLLMClient(
 
   logger.warn(
     "PluginLifecycle",
-    "No runtime completion API found, using mock memory-gate LLM client",
+    "No runtime completion API found, using mock LLM client",
     { model }
   );
 
   return {
     async complete(
       _prompt: string,
-      _systemPrompt: string
+      systemPrompt: string
     ): Promise<string> {
+      if (systemPrompt.includes('"should_update"')) {
+        return JSON.stringify({
+          should_update: false,
+          file: "MEMORY.md",
+          reason: "Mock LLM client in use (runtime.complete unavailable)",
+        });
+      }
+
+      if (systemPrompt.includes('"WRITE_CLEANUP"')) {
+        return JSON.stringify({
+          decision: "NO_WRITE",
+          proposed_updates: {},
+        });
+      }
+
+      if (systemPrompt.includes('"UPDATE_MEMORY"')) {
+        return JSON.stringify({
+          decision: "NO_WRITE",
+          reason: "Mock LLM client in use (runtime.complete unavailable)",
+        });
+      }
+
       return JSON.stringify({
         decision: "NO_WRITE",
         reason: "Mock LLM client in use (runtime.complete unavailable)",
@@ -203,49 +224,39 @@ export default function activate(api: PluginAPI): void {
     });
 
     const workspaceDir = process.cwd();
-    const memoryDir = path.resolve(workspaceDir, config.dailyWriter.memoryDir);
+    const memoryModel = config.memoryGate.model;
+    const llmClient =
+      config.memoryGate.enabled || config.consolidation.enabled
+        ? createLLMClient(api, memoryModel, logger)
+        : undefined;
 
     let memoryGate: MemoryGateAnalyzer | undefined;
-    let dailyWriter: DailyWriter | undefined;
     let fileCurator: FileCurator | undefined;
 
-    if (config.memoryGate.enabled) {
-      const llmClient = createLLMClient(
-        api,
-        config.memoryGate.model,
-        logger
-      );
+    if (config.memoryGate.enabled && llmClient) {
       memoryGate = new MemoryGateAnalyzer(llmClient, logger);
       logger.info("PluginLifecycle", "MemoryGateAnalyzer initialized", {
-        model: config.memoryGate.model,
+        model: memoryModel,
       });
     } else {
       logger.info("PluginLifecycle", "MemoryGateAnalyzer disabled");
     }
 
-    if (config.dailyWriter.enabled) {
-      dailyWriter = new DailyWriter({ memoryDir }, logger);
-      logger.info("PluginLifecycle", "DailyWriter initialized", {
-        memoryDir,
-      });
-    } else {
-      logger.info("PluginLifecycle", "DailyWriter disabled");
+    if (llmClient) {
+      fileCurator = new FileCurator({ workspaceDir }, logger, llmClient);
     }
-
-    fileCurator = new FileCurator({ workspaceDir }, logger);
     logger.info("PluginLifecycle", "FileCurator initialized", {
       workspaceDir,
     });
 
-    if (config.consolidation.enabled) {
+    if (config.consolidation.enabled && llmClient) {
       const consolidationScheduler = new ConsolidationScheduler(
         {
-          memoryDir,
           workspaceDir,
           schedule: config.consolidation.schedule,
-          minDailyEntries: config.consolidation.minDailyEntries,
         },
-        logger
+        logger,
+        llmClient
       );
 
       consolidationScheduler.start();
@@ -255,7 +266,6 @@ export default function activate(api: PluginAPI): void {
         "ConsolidationScheduler initialized and started",
         {
           schedule: config.consolidation.schedule,
-          minDailyEntries: config.consolidation.minDailyEntries,
         }
       );
     } else {
@@ -299,7 +309,6 @@ export default function activate(api: PluginAPI): void {
               logger,
               context,
               memoryGate,
-              dailyWriter,
               fileCurator,
               config.memoryGate.windowSize
             );
@@ -373,7 +382,6 @@ export default function activate(api: PluginAPI): void {
 export { parseConfig } from "./config.js";
 export { FileLogger } from "./logger.js";
 export { SessionBufferManager } from "./session-manager.js";
-export { DailyWriter } from "./daily-writer/index.js";
 export { FileCurator } from "./file-curator/index.js";
 export { MemoryGateAnalyzer, MEMORY_GATE_SYSTEM_PROMPT } from "./memory-gate/index.js";
 export { Consolidator, ConsolidationScheduler } from "./consolidation/index.js";
@@ -383,7 +391,6 @@ export {
   handleSessionEnd,
 } from "./message-handler.js";
 export type {
-  DailyEntry,
   ConsolidationResult,
   LLMClient,
   MemoryGateInput,

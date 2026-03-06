@@ -1,6 +1,5 @@
 export type MemoryDecision =
   | "NO_WRITE"
-  | "WRITE_DAILY"
   | "UPDATE_MEMORY"
   | "UPDATE_USER"
   | "UPDATE_SOUL"

@@ -1,7 +1,6 @@
 import type { SessionBufferManager } from "./session-manager.js";
 import type { Logger, ReflectionMessage } from "./types.js";
 import { MemoryGateAnalyzer, type MemoryGateOutput } from "./memory-gate/index.js";
-import { DailyWriter } from "./daily-writer/index.js";
 import { FileCurator } from "./file-curator/index.js";
 import { ulid } from "ulid";
 
@@ -246,7 +245,6 @@ async function triggerMemoryGate(
   sessionKey: string,
   bufferManager: SessionBufferManager,
   memoryGate: MemoryGateAnalyzer,
-  dailyWriter: DailyWriter | undefined,
   fileCurator: FileCurator | undefined,
   logger: Logger,
   memoryGateWindowSize: number
@@ -285,28 +283,7 @@ async function triggerMemoryGate(
       sessionKey
     );
 
-    if (output.decision === "WRITE_DAILY") {
-      if (dailyWriter) {
-        await dailyWriter.write(output);
-        logger.info(
-          "MessageHandler",
-          "Daily writer triggered by memory gate",
-          {
-            decision: output.decision,
-          },
-          sessionKey
-        );
-      } else {
-        logger.warn(
-          "MessageHandler",
-          "WRITE_DAILY skipped because DailyWriter is unavailable",
-          {
-            decision: output.decision,
-          },
-          sessionKey
-        );
-      }
-    } else if (isUpdateDecision(output.decision)) {
+    if (isUpdateDecision(output.decision)) {
       if (fileCurator) {
         await fileCurator.write(output);
         logger.info(
@@ -397,7 +374,6 @@ export function handleMessageSent(
   logger: Logger,
   hookContext?: unknown,
   memoryGate?: MemoryGateAnalyzer,
-  dailyWriter?: DailyWriter,
   fileCurator?: FileCurator,
   memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
 ): void {
@@ -441,12 +417,11 @@ export function handleMessageSent(
 
   bufferManager.push(sessionKey, message);
 
-  if (memoryGate && (dailyWriter || fileCurator)) {
+  if (memoryGate && fileCurator) {
     void triggerMemoryGate(
       sessionKey,
       bufferManager,
       memoryGate,
-      dailyWriter,
       fileCurator,
       logger,
       memoryGateWindowSize

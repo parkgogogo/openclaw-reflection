@@ -14,14 +14,9 @@ const DEFAULT_CONFIG: PluginConfig = {
     windowSize: 10,
     model: "kimi-coding/k2p5",
   },
-  dailyWriter: {
-    enabled: true,
-    memoryDir: "./memory",
-  },
   consolidation: {
     enabled: true,
     schedule: "0 2 * * *",
-    minDailyEntries: 10,
   },
 };
 
@@ -66,11 +61,9 @@ function getLogLevel(value: unknown): LogLevel {
 export function parseConfig(api: PluginAPI): PluginConfig {
   const config = api.config ?? {};
   const memoryGateRaw = config.get?.("memoryGate");
-  const dailyWriterRaw = config.get?.("dailyWriter");
   const consolidationRaw = config.get?.("consolidation");
 
   const memoryGateConfig = isRecord(memoryGateRaw) ? memoryGateRaw : {};
-  const dailyWriterConfig = isRecord(dailyWriterRaw) ? dailyWriterRaw : {};
   const consolidationConfig = isRecord(consolidationRaw) ? consolidationRaw : {};
 
   return {
@@ -90,16 +83,6 @@ export function parseConfig(api: PluginAPI): PluginConfig {
       ),
       model: getString(memoryGateConfig.model, DEFAULT_CONFIG.memoryGate.model),
     },
-    dailyWriter: {
-      enabled: getBoolean(
-        dailyWriterConfig.enabled,
-        DEFAULT_CONFIG.dailyWriter.enabled
-      ),
-      memoryDir: getString(
-        dailyWriterConfig.memoryDir,
-        DEFAULT_CONFIG.dailyWriter.memoryDir
-      ),
-    },
     consolidation: {
       enabled: getBoolean(
         consolidationConfig.enabled,
@@ -108,10 +91,6 @@ export function parseConfig(api: PluginAPI): PluginConfig {
       schedule: getString(
         consolidationConfig.schedule,
         DEFAULT_CONFIG.consolidation.schedule
-      ),
-      minDailyEntries: getPositiveInteger(
-        consolidationConfig.minDailyEntries,
-        DEFAULT_CONFIG.consolidation.minDailyEntries
       ),
     },
   };

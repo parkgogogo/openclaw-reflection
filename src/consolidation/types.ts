@@ -1,22 +1,21 @@
 export interface ConsolidationConfig {
-  memoryDir: string;
   workspaceDir: string;
   schedule: string;
-  minDailyEntries: number;
+}
+
+export type ConsolidatedFilename = "MEMORY.md" | "USER.md" | "SOUL.md";
+
+export interface ConsolidationPatch {
+  section: string;
+  action: "add" | "replace" | "remove";
+  content: string;
+}
+
+export interface ConsolidationProposal {
+  decision: "NO_WRITE" | "WRITE_CLEANUP";
+  proposedUpdates: Partial<Record<ConsolidatedFilename, ConsolidationPatch[]>>;
 }
 
 export interface ConsolidationResult {
-  updates: {
-    "MEMORY.md"?: string;
-    "USER.md"?: string;
-    "SOUL.md"?: string;
-  };
-  archived: string[];
-}
-
-export interface DailyEntry {
-  time: string;
-  context: string;
-  decisions: string[];
-  next: string[];
+  updates: Partial<Record<ConsolidatedFilename, string>>;
 }

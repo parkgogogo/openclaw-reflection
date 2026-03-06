@@ -32,19 +32,6 @@
           }
         }
       },
-      "dailyWriter": {
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "default": true
-          },
-          "memoryDir": {
-            "type": "string",
-            "default": "./memory"
-          }
-        }
-      },
       "consolidation": {
         "type": "object",
         "properties": {
@@ -55,11 +42,6 @@
           "schedule": {
             "type": "string",
             "default": "0 2 * * *"
-          },
-          "minDailyEntries": {
-            "type": "integer",
-            "minimum": 1,
-            "default": 10
           }
         }
       }
