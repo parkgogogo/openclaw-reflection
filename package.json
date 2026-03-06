@@ -21,6 +21,7 @@
     ]
   },
   "dependencies": {
+    "proper-lockfile": "^4.1.2",
     "ulid": "^2.3.0"
   },
   "devDependencies": {

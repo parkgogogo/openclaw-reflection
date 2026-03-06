@@ -1,5 +1,8 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import lockfile from "proper-lockfile";
+
+const LOCK_TIMEOUT_MS = 5000;
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -18,6 +21,43 @@ function formatDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}.md`;
+}
+
+async function createFileIfMissing(filePath: string): Promise<void> {
+  try {
+    await fs.access(filePath);
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      const handle = await fs.open(filePath, "a");
+      await handle.close();
+      return;
+    }
+
+    throw error;
+  }
+}
+
+async function lockForWrite(filePath: string): Promise<() => Promise<void>> {
+  await ensureDir(path.dirname(filePath));
+  await createFileIfMissing(filePath);
+
+  try {
+    return await lockfile.lock(filePath, {
+      retries: {
+        retries: 5,
+        factor: 1,
+        minTimeout: 1000,
+        maxTimeout: 1000,
+        randomize: false,
+      },
+      stale: LOCK_TIMEOUT_MS,
+      realpath: false,
+    });
+  } catch (error) {
+    throw new Error(
+      `Failed to acquire lock for "${filePath}" within ${LOCK_TIMEOUT_MS}ms: ${getErrorMessage(error)}`
+    );
+  }
 }
 
 export async function ensureDir(dirPath: string): Promise<void> {
@@ -58,6 +98,19 @@ export async function writeFile(
   }
 }
 
+export async function writeFileWithLock(
+  filePath: string,
+  content: string
+): Promise<void> {
+  const release = await lockForWrite(filePath);
+
+  try {
+    await writeFile(filePath, content);
+  } finally {
+    await release();
+  }
+}
+
 export async function appendFile(
   filePath: string,
   content: string
@@ -69,6 +122,19 @@ export async function appendFile(
     throw new Error(
       `Failed to append file \"${filePath}\": ${getErrorMessage(error)}`
     );
+  }
+}
+
+export async function appendFileWithLock(
+  filePath: string,
+  content: string
+): Promise<void> {
+  const release = await lockForWrite(filePath);
+
+  try {
+    await appendFile(filePath, content);
+  } finally {
+    await release();
   }
 }
 

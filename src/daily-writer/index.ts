@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import * as path from "path";
 import type { MemoryGateOutput } from "../memory-gate/types.js";
 import type { Logger } from "../types.js";
-import { appendFile, ensureDir, getTodayFilename } from "../utils/file-utils.js";
+import { appendFileWithLock, ensureDir, getTodayFilename } from "../utils/file-utils.js";
 
 interface DailyWriterConfig {
   memoryDir: string;
@@ -78,7 +78,7 @@ export class DailyWriter {
 
         try {
           await ensureDir(this.config.memoryDir);
-          await appendFile(task.filePath, task.content);
+          await appendFileWithLock(task.filePath, task.content);
           this.writeQueue.shift();
           this.settleTaskSuccess(task.id);
 
