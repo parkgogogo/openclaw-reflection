@@ -1,15 +1,35 @@
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface Logger {
-  debug(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string): void;
-  info(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string): void;
-  warn(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string): void;
-  error(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string): void;
+  debug(
+    component: string,
+    event: string,
+    details?: Record<string, unknown>,
+    sessionKey?: string
+  ): void;
+  info(
+    component: string,
+    event: string,
+    details?: Record<string, unknown>,
+    sessionKey?: string
+  ): void;
+  warn(
+    component: string,
+    event: string,
+    details?: Record<string, unknown>,
+    sessionKey?: string
+  ): void;
+  error(
+    component: string,
+    event: string,
+    details?: Record<string, unknown>,
+    sessionKey?: string
+  ): void;
 }
 
 export interface ReflectionMessage {
   id: string;
-  role: 'user' | 'agent';
+  role: "user" | "agent";
   message: string;
   timestamp: number;
   sessionKey: string;
@@ -63,3 +83,6 @@ export interface PluginConfig {
   dailyWriter: DailyWriterConfig;
   consolidation: ConsolidationConfig;
 }
+
+export type { LLMClient, MemoryGateInput } from "./memory-gate/types.js";
+export type { ConsolidationResult, DailyEntry } from "./consolidation/types.js";

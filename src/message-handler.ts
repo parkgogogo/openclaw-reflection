@@ -4,7 +4,7 @@ import { MemoryGateAnalyzer, type MemoryGateOutput } from "./memory-gate/index.j
 import { DailyWriter } from "./daily-writer/index.js";
 import { ulid } from "ulid";
 
-const MEMORY_GATE_WINDOW_SIZE = 10;
+const DEFAULT_MEMORY_GATE_WINDOW_SIZE = 10;
 
 interface MessageEvent {
   message?: {
@@ -232,11 +232,16 @@ async function triggerMemoryGate(
   bufferManager: SessionBufferManager,
   memoryGate: MemoryGateAnalyzer,
   dailyWriter: DailyWriter,
-  logger: Logger
+  logger: Logger,
+  memoryGateWindowSize: number
 ): Promise<void> {
+  const normalizedWindowSize = Number.isInteger(memoryGateWindowSize)
+    ? Math.max(memoryGateWindowSize, 1)
+    : DEFAULT_MEMORY_GATE_WINDOW_SIZE;
+
   const sessionMessages = bufferManager.getMessages(sessionKey);
   const recentMessages = sessionMessages
-    .slice(-MEMORY_GATE_WINDOW_SIZE)
+    .slice(-normalizedWindowSize)
     .map((message) => ({
       role: message.role,
       message: message.message,
@@ -313,6 +318,18 @@ export function handleMessageReceived(
     channelId
   );
 
+  if (message.message.trim() === "") {
+    logger.debug(
+      "MessageHandler",
+      "Skipped empty user message",
+      {
+        hookName: "message:received",
+      },
+      sessionKey
+    );
+    return;
+  }
+
   logger.info(
     "MessageHandler",
     "Buffer message snapshot",
@@ -332,7 +349,8 @@ export function handleMessageSent(
   logger: Logger,
   hookContext?: unknown,
   memoryGate?: MemoryGateAnalyzer,
-  dailyWriter?: DailyWriter
+  dailyWriter?: DailyWriter,
+  memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
 ): void {
   const normalizedEvent = normalizeMessageEvent(event, hookContext);
   const sessionKey = resolveSessionKey(normalizedEvent, logger, "message:sent");
@@ -349,6 +367,18 @@ export function handleMessageSent(
     sessionKey,
     channelId
   );
+
+  if (message.message.trim() === "") {
+    logger.debug(
+      "MessageHandler",
+      "Skipped empty agent message",
+      {
+        hookName: "message:sent",
+      },
+      sessionKey
+    );
+    return;
+  }
 
   logger.info(
     "MessageHandler",
@@ -368,7 +398,8 @@ export function handleMessageSent(
       bufferManager,
       memoryGate,
       dailyWriter,
-      logger
+      logger,
+      memoryGateWindowSize
     );
   }
 }

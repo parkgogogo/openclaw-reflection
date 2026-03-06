@@ -38,10 +38,10 @@ async function createFileIfMissing(filePath: string): Promise<void> {
 }
 
 async function lockForWrite(filePath: string): Promise<() => Promise<void>> {
-  await ensureDir(path.dirname(filePath));
-  await createFileIfMissing(filePath);
-
   try {
+    await ensureDir(path.dirname(filePath));
+    await createFileIfMissing(filePath);
+
     return await lockfile.lock(filePath, {
       retries: {
         retries: 5,
@@ -60,13 +60,24 @@ async function lockForWrite(filePath: string): Promise<() => Promise<void>> {
   }
 }
 
+async function releaseLock(
+  release: () => Promise<void>,
+  filePath: string
+): Promise<void> {
+  try {
+    await release();
+  } catch (error) {
+    throw new Error(
+      `Failed to release lock for "${filePath}": ${getErrorMessage(error)}`
+    );
+  }
+}
+
 export async function ensureDir(dirPath: string): Promise<void> {
   try {
     await fs.mkdir(dirPath, { recursive: true });
   } catch (error) {
-    throw new Error(
-      `Failed to ensure directory \"${dirPath}\": ${getErrorMessage(error)}`
-    );
+    throw new Error(`Failed to ensure directory "${dirPath}": ${getErrorMessage(error)}`);
   }
 }
 
@@ -78,23 +89,16 @@ export async function readFile(filePath: string): Promise<string | null> {
       return null;
     }
 
-    throw new Error(
-      `Failed to read file \"${filePath}\": ${getErrorMessage(error)}`
-    );
+    throw new Error(`Failed to read file "${filePath}": ${getErrorMessage(error)}`);
   }
 }
 
-export async function writeFile(
-  filePath: string,
-  content: string
-): Promise<void> {
+export async function writeFile(filePath: string, content: string): Promise<void> {
   try {
     await ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, content, "utf8");
   } catch (error) {
-    throw new Error(
-      `Failed to write file \"${filePath}\": ${getErrorMessage(error)}`
-    );
+    throw new Error(`Failed to write file "${filePath}": ${getErrorMessage(error)}`);
   }
 }
 
@@ -103,25 +107,39 @@ export async function writeFileWithLock(
   content: string
 ): Promise<void> {
   const release = await lockForWrite(filePath);
+  let writeError: unknown;
 
   try {
     await writeFile(filePath, content);
-  } finally {
-    await release();
+  } catch (error) {
+    writeError = error;
+  }
+
+  try {
+    await releaseLock(release, filePath);
+  } catch (releaseError) {
+    if (writeError) {
+      throw new Error(
+        `Write and release failed for "${filePath}": write=${getErrorMessage(writeError)}; release=${getErrorMessage(releaseError)}`
+      );
+    }
+
+    throw releaseError;
+  }
+
+  if (writeError) {
+    throw new Error(
+      `Failed to write file with lock "${filePath}": ${getErrorMessage(writeError)}`
+    );
   }
 }
 
-export async function appendFile(
-  filePath: string,
-  content: string
-): Promise<void> {
+export async function appendFile(filePath: string, content: string): Promise<void> {
   try {
     await ensureDir(path.dirname(filePath));
     await fs.appendFile(filePath, content, "utf8");
   } catch (error) {
-    throw new Error(
-      `Failed to append file \"${filePath}\": ${getErrorMessage(error)}`
-    );
+    throw new Error(`Failed to append file "${filePath}": ${getErrorMessage(error)}`);
   }
 }
 
@@ -130,11 +148,30 @@ export async function appendFileWithLock(
   content: string
 ): Promise<void> {
   const release = await lockForWrite(filePath);
+  let appendError: unknown;
 
   try {
     await appendFile(filePath, content);
-  } finally {
-    await release();
+  } catch (error) {
+    appendError = error;
+  }
+
+  try {
+    await releaseLock(release, filePath);
+  } catch (releaseError) {
+    if (appendError) {
+      throw new Error(
+        `Append and release failed for "${filePath}": append=${getErrorMessage(appendError)}; release=${getErrorMessage(releaseError)}`
+      );
+    }
+
+    throw releaseError;
+  }
+
+  if (appendError) {
+    throw new Error(
+      `Failed to append file with lock "${filePath}": ${getErrorMessage(appendError)}`
+    );
   }
 }
 
@@ -152,7 +189,7 @@ export async function listFiles(dirPath: string): Promise<string[]> {
     }
 
     throw new Error(
-      `Failed to list files in \"${dirPath}\": ${getErrorMessage(error)}`
+      `Failed to list files in "${dirPath}": ${getErrorMessage(error)}`
     );
   }
 }
@@ -169,13 +206,13 @@ export async function moveFile(fromPath: string, toPath: string): Promise<void> 
         return;
       } catch (copyError) {
         throw new Error(
-          `Failed to move file \"${fromPath}\" to \"${toPath}\": ${getErrorMessage(copyError)}`
+          `Failed to move file "${fromPath}" to "${toPath}": ${getErrorMessage(copyError)}`
         );
       }
     }
 
     throw new Error(
-      `Failed to move file \"${fromPath}\" to \"${toPath}\": ${getErrorMessage(error)}`
+      `Failed to move file "${fromPath}" to "${toPath}": ${getErrorMessage(error)}`
     );
   }
 }

@@ -1,6 +1,6 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import type { LogEntry, LogLevel } from './types.js';
+import * as fs from "fs";
+import * as path from "path";
+import type { LogEntry, LogLevel } from "./types.js";
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 0,
@@ -10,10 +10,16 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 };
 
 function parseLogLevel(level: string): LogLevel {
-  if (level === 'debug' || level === 'info' || level === 'warn' || level === 'error') {
+  if (
+    level === "debug" ||
+    level === "info" ||
+    level === "warn" ||
+    level === "error"
+  ) {
     return level;
   }
-  return 'info';
+
+  return "info";
 }
 
 export class FileLogger {
@@ -24,7 +30,7 @@ export class FileLogger {
   constructor(pluginRootDir: string, level: string) {
     this.pluginRootDir = pluginRootDir;
     this.level = parseLogLevel(level);
-    this.logsDir = path.join(pluginRootDir, 'logs');
+    this.logsDir = path.join(pluginRootDir, "logs");
     this.ensureLogsDir();
   }
 
@@ -35,7 +41,7 @@ export class FileLogger {
   }
 
   private getLogFilePath(): string {
-    const date = new Date().toISOString().split('T')[0];
+    const date = new Date().toISOString().split("T")[0];
     return path.join(this.logsDir, `reflection-${date}.log`);
   }
 
@@ -48,13 +54,13 @@ export class FileLogger {
   }
 
   private writeLog(entry: LogEntry): void {
-    const logLine = JSON.stringify(entry) + '\n';
+    const logLine = `${JSON.stringify(entry)}\n`;
     const logFile = this.getLogFilePath();
 
     try {
-      fs.appendFileSync(logFile, logLine, 'utf-8');
-    } catch (err) {
-      console.error('[ReflectionPlugin] Failed to write log:', err);
+      fs.appendFileSync(logFile, logLine, "utf-8");
+    } catch (error) {
+      console.error("[ReflectionPlugin] Failed to write log:", error);
     }
   }
 
@@ -81,19 +87,39 @@ export class FileLogger {
     this.writeLog(entry);
   }
 
-  debug(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string): void {
-    this.log('debug', component, event, details, sessionKey);
+  debug(
+    component: string,
+    event: string,
+    details?: Record<string, unknown>,
+    sessionKey?: string
+  ): void {
+    this.log("debug", component, event, details, sessionKey);
   }
 
-  info(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string): void {
-    this.log('info', component, event, details, sessionKey);
+  info(
+    component: string,
+    event: string,
+    details?: Record<string, unknown>,
+    sessionKey?: string
+  ): void {
+    this.log("info", component, event, details, sessionKey);
   }
 
-  warn(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string): void {
-    this.log('warn', component, event, details, sessionKey);
+  warn(
+    component: string,
+    event: string,
+    details?: Record<string, unknown>,
+    sessionKey?: string
+  ): void {
+    this.log("warn", component, event, details, sessionKey);
   }
 
-  error(component: string, event: string, details?: Record<string, unknown>, sessionKey?: string): void {
-    this.log('error', component, event, details, sessionKey);
+  error(
+    component: string,
+    event: string,
+    details?: Record<string, unknown>,
+    sessionKey?: string
+  ): void {
+    this.log("error", component, event, details, sessionKey);
   }
 }

@@ -2,7 +2,11 @@ import { randomUUID } from "crypto";
 import * as path from "path";
 import type { MemoryGateOutput } from "../memory-gate/types.js";
 import type { Logger } from "../types.js";
-import { appendFileWithLock, ensureDir, getTodayFilename } from "../utils/file-utils.js";
+import {
+  appendFileWithLock,
+  ensureDir,
+  getTodayFilename,
+} from "../utils/file-utils.js";
 
 interface DailyWriterConfig {
   memoryDir: string;
@@ -27,6 +31,14 @@ function formatTime(date: Date): string {
   return `${hours}:${minutes}`;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
 export class DailyWriter {
   private config: DailyWriterConfig;
   private logger: Logger;
@@ -40,7 +52,11 @@ export class DailyWriter {
   }
 
   private async sleep(milliseconds: number): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, milliseconds));
+    try {
+      await new Promise((resolve) => setTimeout(resolve, milliseconds));
+    } catch (error) {
+      throw new Error(`Failed during write backoff sleep: ${getErrorMessage(error)}`);
+    }
   }
 
   private settleTaskSuccess(taskId: string): void {
@@ -88,7 +104,7 @@ export class DailyWriter {
           });
         } catch (error) {
           if (task.retries >= task.maxRetries) {
-            const reason = error instanceof Error ? error.message : String(error);
+            const reason = getErrorMessage(error);
             this.writeQueue.shift();
             this.settleTaskFailure(task.id, error);
 
@@ -125,38 +141,44 @@ export class DailyWriter {
   }
 
   async write(output: MemoryGateOutput): Promise<void> {
-    if (output.decision !== "WRITE_DAILY") {
-      return;
-    }
+    try {
+      if (output.decision !== "WRITE_DAILY") {
+        return;
+      }
 
-    const now = new Date();
-    const dailyFilePath = path.join(this.config.memoryDir, getTodayFilename());
-    const candidateFact = output.candidateFact ?? "No candidate fact provided";
-    const entry =
-      `## [${formatTime(now)}]\n` +
-      `Context:\n` +
-      `- ${output.reason}\n\n` +
-      `Decisions:\n` +
-      `- ${candidateFact}\n\n`;
+      const now = new Date();
+      const dailyFilePath = path.join(this.config.memoryDir, getTodayFilename());
+      const candidateFact = output.candidateFact ?? "No candidate fact provided";
+      const entry =
+        `## [${formatTime(now)}]\n` +
+        "Context:\n" +
+        `- ${output.reason}\n\n` +
+        "Decisions:\n" +
+        `- ${candidateFact}\n\n`;
 
-    const task: WriteTask = {
-      id: randomUUID(),
-      filePath: dailyFilePath,
-      content: entry,
-      retries: 0,
-      maxRetries: 3,
-    };
-
-    return new Promise<void>((resolve, reject) => {
-      this.taskHandlers.set(task.id, { resolve, reject });
-      this.writeQueue.push(task);
-
-      this.logger.info("DailyWriter", "Queued daily write task", {
-        taskId: task.id,
+      const task: WriteTask = {
+        id: randomUUID(),
         filePath: dailyFilePath,
-      });
+        content: entry,
+        retries: 0,
+        maxRetries: 3,
+      };
 
-      void this.processQueue();
-    });
+      return await new Promise<void>((resolve, reject) => {
+        this.taskHandlers.set(task.id, { resolve, reject });
+        this.writeQueue.push(task);
+
+        this.logger.info("DailyWriter", "Queued daily write task", {
+          taskId: task.id,
+          filePath: dailyFilePath,
+        });
+
+        void this.processQueue();
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to enqueue daily write task: ${getErrorMessage(error)}`
+      );
+    }
   }
 }

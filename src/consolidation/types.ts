@@ -13,3 +13,9 @@ export interface ConsolidationResult {
   };
   archived: string[];
 }
+
+export interface DailyEntry {
+  time: string;
+  context: string;
+  decisions: string[];
+}

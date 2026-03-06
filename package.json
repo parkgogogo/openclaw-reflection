@@ -1,11 +1,13 @@
 {
-  "name": "reflection-plugin",
+  "name": "openclaw-reflection-plugin",
   "version": "1.0.0",
   "description": "OpenClaw plugin for capturing and storing conversation messages in a circular buffer",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "clean": "rm -rf logs"
+    "build": "tsc --noEmit",
+    "clean": "rm -rf logs",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "openclaw",
@@ -25,6 +27,7 @@
     "ulid": "^2.3.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
   }
 }

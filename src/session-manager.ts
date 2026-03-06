@@ -1,5 +1,5 @@
-import { CircularBuffer } from './buffer.js';
-import type { Logger, ReflectionMessage } from './types.js';
+import { CircularBuffer } from "./buffer.js";
+import type { Logger, ReflectionMessage } from "./types.js";
 
 interface SessionData {
   buffer: CircularBuffer<ReflectionMessage>;
@@ -21,7 +21,12 @@ export class SessionBufferManager {
     let sessionData = this.sessions.get(sessionKey);
 
     if (!sessionData) {
-      this.logger.info('SessionBufferManager', 'Creating new session buffer', { sessionKey }, sessionKey);
+      this.logger.info(
+        "SessionBufferManager",
+        "Creating new session buffer",
+        { sessionKey },
+        sessionKey
+      );
       sessionData = {
         buffer: new CircularBuffer<ReflectionMessage>(this.capacity),
         lastAccessed: Date.now(),
@@ -31,7 +36,12 @@ export class SessionBufferManager {
 
     const evicted = sessionData.buffer.push(message);
     if (evicted) {
-      this.logger.info('SessionBufferManager', 'Evicted oldest message', { evictedId: evicted.id }, sessionKey);
+      this.logger.info(
+        "SessionBufferManager",
+        "Evicted oldest message",
+        { evictedId: evicted.id },
+        sessionKey
+      );
     }
 
     sessionData.lastAccessed = Date.now();
@@ -53,7 +63,12 @@ export class SessionBufferManager {
     this.sessions.delete(sessionKey);
 
     if (existed) {
-      this.logger.info('SessionBufferManager', 'Session cleared', { sessionKey }, sessionKey);
+      this.logger.info(
+        "SessionBufferManager",
+        "Session cleared",
+        { sessionKey },
+        sessionKey
+      );
     }
   }
 

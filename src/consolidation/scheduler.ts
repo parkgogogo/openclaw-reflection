@@ -9,6 +9,14 @@ interface DailySchedule {
   hour: number;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
 function parseNumber(value: string): number | null {
   if (!/^\d+$/.test(value)) {
     return null;
@@ -80,25 +88,32 @@ export class ConsolidationScheduler {
       return;
     }
 
-    const parsedSchedule = parseDailySchedule(this.config.schedule);
-    const nextRunAt = getNextRunTime(parsedSchedule);
-    const delayMs = Math.max(nextRunAt.getTime() - Date.now(), 0);
+    try {
+      const parsedSchedule = parseDailySchedule(this.config.schedule);
+      const nextRunAt = getNextRunTime(parsedSchedule);
+      const delayMs = Math.max(nextRunAt.getTime() - Date.now(), 0);
 
-    this.logger.info("ConsolidationScheduler", "Scheduler started", {
-      schedule: this.config.schedule,
-      nextRunAt: nextRunAt.toISOString(),
-      delayMs,
-    });
+      this.logger.info("ConsolidationScheduler", "Scheduler started", {
+        schedule: this.config.schedule,
+        nextRunAt: nextRunAt.toISOString(),
+        delayMs,
+      });
 
-    this.timeoutId = setTimeout(() => {
-      void this.runConsolidation();
-
-      this.intervalId = setInterval(() => {
+      this.timeoutId = setTimeout(() => {
         void this.runConsolidation();
-      }, DAY_IN_MS);
 
-      this.timeoutId = null;
-    }, delayMs);
+        this.intervalId = setInterval(() => {
+          void this.runConsolidation();
+        }, DAY_IN_MS);
+
+        this.timeoutId = null;
+      }, delayMs);
+    } catch (error) {
+      this.logger.error("ConsolidationScheduler", "Failed to start scheduler", {
+        schedule: this.config.schedule,
+        reason: getErrorMessage(error),
+      });
+    }
   }
 
   stop(): void {
@@ -129,7 +144,7 @@ export class ConsolidationScheduler {
         updatedFiles: Object.keys(result.updates),
       });
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = getErrorMessage(error);
       this.logger.error("ConsolidationScheduler", "Scheduled consolidation run failed", {
         reason,
       });

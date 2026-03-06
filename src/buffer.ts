@@ -4,7 +4,7 @@ export class CircularBuffer<T> {
 
   constructor(capacity: number) {
     if (!Number.isInteger(capacity) || capacity <= 0) {
-      throw new Error('CircularBuffer capacity must be a positive integer');
+      throw new Error("CircularBuffer capacity must be a positive integer");
     }
 
     this.capacity = capacity;

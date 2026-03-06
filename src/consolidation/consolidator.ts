@@ -34,6 +34,14 @@ function isOlderThanDays(date: Date, days: number, now: Date): boolean {
   return date < cutoff;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
 export class Consolidator {
   private config: ConsolidationConfig;
   private logger: Logger;
@@ -101,14 +109,23 @@ export class Consolidator {
       const fromPath = path.join(this.config.memoryDir, file);
       const toPath = path.join(archiveDir, file);
 
-      await moveFile(fromPath, toPath);
-      archived.push(file);
+      try {
+        await moveFile(fromPath, toPath);
+        archived.push(file);
 
-      this.logger.info("Consolidator", "Archived old daily file", {
-        file,
-        fromPath,
-        toPath,
-      });
+        this.logger.info("Consolidator", "Archived old daily file", {
+          file,
+          fromPath,
+          toPath,
+        });
+      } catch (error) {
+        this.logger.error("Consolidator", "Failed to archive daily file", {
+          file,
+          fromPath,
+          toPath,
+          reason: getErrorMessage(error),
+        });
+      }
     }
 
     return archived;
