@@ -31,7 +31,35 @@ export interface LogEntry {
   details?: Record<string, unknown>;
 }
 
+export type MemoryDecision = "NO_WRITE" | "WRITE_DAILY";
+
+export interface MemoryGateOutput {
+  decision: MemoryDecision;
+  reason: string;
+  candidateFact?: string;
+}
+
+export interface MemoryGateConfig {
+  enabled: boolean;
+  windowSize: number;
+  model: string;
+}
+
+export interface DailyWriterConfig {
+  enabled: boolean;
+  memoryDir: string;
+}
+
+export interface ConsolidationConfig {
+  enabled: boolean;
+  schedule: string;
+  minDailyEntries: number;
+}
+
 export interface PluginConfig {
   bufferSize: number;
   logLevel: LogLevel;
+  memoryGate: MemoryGateConfig;
+  dailyWriter: DailyWriterConfig;
+  consolidation: ConsolidationConfig;
 }
