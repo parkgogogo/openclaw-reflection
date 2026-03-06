@@ -1,6 +1,10 @@
 import type { SessionBufferManager } from "./session-manager.js";
 import type { Logger, ReflectionMessage } from "./types.js";
+import { MemoryGateAnalyzer, type MemoryGateOutput } from "./memory-gate/index.js";
+import { DailyWriter } from "./daily-writer/index.js";
 import { ulid } from "ulid";
+
+const MEMORY_GATE_WINDOW_SIZE = 10;
 
 interface MessageEvent {
   message?: {
@@ -210,6 +214,78 @@ function createReflectionMessage(
   };
 }
 
+function findLatestMessageByRole(
+  messages: ReflectionMessage[],
+  role: ReflectionMessage["role"]
+): string {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === role) {
+      return messages[index].message;
+    }
+  }
+
+  return "";
+}
+
+async function triggerMemoryGate(
+  sessionKey: string,
+  bufferManager: SessionBufferManager,
+  memoryGate: MemoryGateAnalyzer,
+  dailyWriter: DailyWriter,
+  logger: Logger
+): Promise<void> {
+  const sessionMessages = bufferManager.getMessages(sessionKey);
+  const recentMessages = sessionMessages
+    .slice(-MEMORY_GATE_WINDOW_SIZE)
+    .map((message) => ({
+      role: message.role,
+      message: message.message,
+      timestamp: message.timestamp,
+    }));
+
+  const currentUserMessage = findLatestMessageByRole(sessionMessages, "user");
+  const currentAgentReply = findLatestMessageByRole(sessionMessages, "agent");
+
+  try {
+    const output: MemoryGateOutput = await memoryGate.analyze({
+      recentMessages,
+      currentUserMessage,
+      currentAgentReply,
+    });
+
+    logger.info(
+      "MessageHandler",
+      "Memory gate decision evaluated",
+      {
+        decision: output.decision,
+        reason: output.reason,
+        hasCandidateFact: Boolean(output.candidateFact),
+      },
+      sessionKey
+    );
+
+    if (output.decision === "WRITE_DAILY") {
+      await dailyWriter.write(output);
+      logger.info(
+        "MessageHandler",
+        "Daily writer triggered by memory gate",
+        {
+          decision: output.decision,
+        },
+        sessionKey
+      );
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logger.error(
+      "MessageHandler",
+      "Memory gate trigger failed",
+      { reason },
+      sessionKey
+    );
+  }
+}
+
 // index.ts passes FileLogger here; handlers should only use this injected logger.
 export function handleMessageReceived(
   event: unknown,
@@ -254,7 +330,9 @@ export function handleMessageSent(
   event: unknown,
   bufferManager: SessionBufferManager,
   logger: Logger,
-  hookContext?: unknown
+  hookContext?: unknown,
+  memoryGate?: MemoryGateAnalyzer,
+  dailyWriter?: DailyWriter
 ): void {
   const normalizedEvent = normalizeMessageEvent(event, hookContext);
   const sessionKey = resolveSessionKey(normalizedEvent, logger, "message:sent");
@@ -283,6 +361,16 @@ export function handleMessageSent(
   );
 
   bufferManager.push(sessionKey, message);
+
+  if (memoryGate && dailyWriter) {
+    void triggerMemoryGate(
+      sessionKey,
+      bufferManager,
+      memoryGate,
+      dailyWriter,
+      logger
+    );
+  }
 }
 
 export function handleSessionEnd(
