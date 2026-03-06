@@ -273,7 +273,8 @@ export default function activate(api: PluginAPI): void {
               runtimeFileLogger,
               context,
               memoryGate,
-              dailyWriter
+              dailyWriter,
+              config.memoryGate.windowSize
             );
           }
         });

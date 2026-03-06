@@ -7,12 +7,61 @@
       "bufferSize": {
         "type": "integer",
         "minimum": 1,
-        "default": 100
+        "default": 50
       },
       "logLevel": {
         "type": "string",
         "enum": ["debug", "info", "warn", "error"],
         "default": "info"
+      },
+      "memoryGate": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "windowSize": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 10
+          },
+          "model": {
+            "type": "string",
+            "default": "kimi-coding/k2p5"
+          }
+        }
+      },
+      "dailyWriter": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "memoryDir": {
+            "type": "string",
+            "default": "./memory"
+          }
+        }
+      },
+      "consolidation": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "schedule": {
+            "type": "string",
+            "default": "0 2 * * *"
+          },
+          "minDailyEntries": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 10
+          }
+        }
       }
     }
   }

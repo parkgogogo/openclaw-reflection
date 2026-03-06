@@ -67,21 +67,24 @@ function normalizeMessageEvent(event: unknown, hookContext?: unknown): MessageEv
   const rawMessage = toRecord(event.message);
   const rawEventContext = toRecord(event.context);
   const rawHookContext = toRecord(hookContext);
-  const rawContext = rawEventContext ?? rawHookContext;
+  const rawContext: Record<string, unknown> = {
+    ...(rawHookContext ?? {}),
+    ...(rawEventContext ?? {}),
+  };
   const rawSession = toRecord(event.session);
   const rawMetadata = toRecord(event.metadata);
 
-  // Get content from either message.content, message.text, event.content, or event.text
-  const content = rawMessage
-    ? getNonEmptyString(rawMessage.content) ??
-      getNonEmptyString(rawMessage.text)
-    : getNonEmptyString(event.content) ??
-      getNonEmptyString(event.text) ??
-      getNonEmptyString(event.bodyForAgent) ??
-      getNonEmptyString(event.body) ??
-      getNonEmptyString(rawContext?.content) ??
-      getNonEmptyString(rawContext?.text) ??
-      getNonEmptyString(event.transcript);
+  // Use a field-level fallback chain across all known payload shapes.
+  const content =
+    getNonEmptyString(rawMessage?.content) ??
+    getNonEmptyString(rawMessage?.text) ??
+    getNonEmptyString(event.content) ??
+    getNonEmptyString(event.text) ??
+    getNonEmptyString(event.bodyForAgent) ??
+    getNonEmptyString(event.body) ??
+    getNonEmptyString(rawContext.content) ??
+    getNonEmptyString(rawContext.text) ??
+    getNonEmptyString(event.transcript);
 
   const sessionKey =
     getNonEmptyString(event.sessionKey) ??
