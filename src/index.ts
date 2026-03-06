@@ -1,6 +1,9 @@
 import { parseConfig } from "./config.js";
 import { FileLogger } from "./logger.js";
 import { SessionBufferManager } from "./session-manager.js";
+import { MemoryGateAnalyzer, type LLMClient } from "./memory-gate/index.js";
+import { DailyWriter } from "./daily-writer/index.js";
+import { ConsolidationScheduler } from "./consolidation/index.js";
 import {
   handleMessageReceived,
   handleMessageSent,
@@ -19,11 +22,20 @@ interface PluginLogger {
   error: LoggerMethod;
 }
 
+interface RuntimeCompletionAPI {
+  complete?: (input: {
+    model: string;
+    prompt: string;
+    systemPrompt: string;
+  }) => Promise<unknown>;
+}
+
 interface PluginAPI {
   config?: {
     get?: (key: string) => unknown;
   };
   logger: PluginLogger;
+  runtime?: RuntimeCompletionAPI;
   registerHook: (
     event: string,
     handler: (event: unknown, context?: unknown) => void,
@@ -40,6 +52,68 @@ let bufferManager: SessionBufferManager | null = null;
 let gatewayLogger: PluginLogger | null = null;
 let fileLogger: FileLogger | null = null;
 let isRegistered = false;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getCompletionText(result: unknown): string | null {
+  if (typeof result === "string") {
+    return result;
+  }
+
+  if (!isRecord(result)) {
+    return null;
+  }
+
+  if (typeof result.text === "string") {
+    return result.text;
+  }
+
+  if (typeof result.output_text === "string") {
+    return result.output_text;
+  }
+
+  return null;
+}
+
+function createLLMClient(api: PluginAPI, model: string, logger: FileLogger): LLMClient {
+  const runtimeComplete = api.runtime?.complete;
+
+  if (typeof runtimeComplete === "function") {
+    return {
+      async complete(prompt: string, systemPrompt: string): Promise<string> {
+        const response = await runtimeComplete({
+          model,
+          prompt,
+          systemPrompt,
+        });
+        const completionText = getCompletionText(response);
+
+        if (completionText === null) {
+          throw new Error("runtime.complete returned non-text response");
+        }
+
+        return completionText;
+      },
+    };
+  }
+
+  logger.warn(
+    "PluginLifecycle",
+    "No runtime completion API found, using mock memory-gate LLM client",
+    { model }
+  );
+
+  return {
+    async complete(_prompt: string, _systemPrompt: string): Promise<string> {
+      return JSON.stringify({
+        decision: "NO_WRITE",
+        reason: "Mock LLM client in use (runtime.complete unavailable)",
+      });
+    },
+  };
+}
 
 export default function activate(api: PluginAPI): void {
   if (isRegistered) {
@@ -96,6 +170,60 @@ export default function activate(api: PluginAPI): void {
     }
   );
 
+  const workspaceDir = process.cwd();
+  const memoryDir = path.resolve(workspaceDir, config.dailyWriter.memoryDir);
+
+  let memoryGate: MemoryGateAnalyzer | undefined;
+  let dailyWriter: DailyWriter | undefined;
+
+  if (config.memoryGate.enabled) {
+    const llmClient = createLLMClient(
+      api,
+      config.memoryGate.model,
+      runtimeFileLogger
+    );
+    memoryGate = new MemoryGateAnalyzer(llmClient, runtimeFileLogger);
+    runtimeFileLogger.info("PluginLifecycle", "MemoryGateAnalyzer initialized", {
+      model: config.memoryGate.model,
+    });
+  } else {
+    runtimeFileLogger.info("PluginLifecycle", "MemoryGateAnalyzer disabled");
+  }
+
+  if (config.dailyWriter.enabled) {
+    dailyWriter = new DailyWriter({ memoryDir }, runtimeFileLogger);
+    runtimeFileLogger.info("PluginLifecycle", "DailyWriter initialized", {
+      memoryDir,
+    });
+  } else {
+    runtimeFileLogger.info("PluginLifecycle", "DailyWriter disabled");
+  }
+
+  if (config.consolidation.enabled) {
+    const consolidationScheduler = new ConsolidationScheduler(
+      {
+        memoryDir,
+        workspaceDir,
+        schedule: config.consolidation.schedule,
+        minDailyEntries: config.consolidation.minDailyEntries,
+      },
+      runtimeFileLogger
+    );
+
+    consolidationScheduler.start();
+
+    runtimeFileLogger.info(
+      "PluginLifecycle",
+      "ConsolidationScheduler initialized and started",
+      {
+        schedule: config.consolidation.schedule,
+        minDailyEntries: config.consolidation.minDailyEntries,
+      }
+    );
+  } else {
+    runtimeFileLogger.info("PluginLifecycle", "ConsolidationScheduler disabled");
+  }
+
   // Register message hooks via typed hook runner first.
   // This path does not depend on internal hook sessionKey gating.
   if (typeof api.on === "function") {
@@ -107,7 +235,14 @@ export default function activate(api: PluginAPI): void {
 
     api.on("message_sent", (event: unknown, context?: unknown) => {
       if (bufferManager) {
-        handleMessageSent(event, bufferManager, runtimeFileLogger, context);
+        handleMessageSent(
+          event,
+          bufferManager,
+          runtimeFileLogger,
+          context,
+          memoryGate,
+          dailyWriter
+        );
       }
     });
 
