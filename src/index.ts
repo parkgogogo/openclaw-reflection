@@ -265,14 +265,33 @@ export default function activate(api: PluginAPI): void {
     if (typeof api.on === "function") {
       api.on("message_received", (event: unknown, context?: unknown) => {
         runHookSafely(logger, "message_received", () => {
+          logger.debug("PluginLifecycle", "Callback invoked", {
+            hook: "message_received",
+            hasContext: context !== undefined,
+            hasBufferManager: Boolean(bufferManager),
+          });
+
           if (bufferManager) {
             handleMessageReceived(event, bufferManager, logger, context);
+            logger.debug("PluginLifecycle", "Callback completed", {
+              hook: "message_received",
+            });
+          } else {
+            logger.warn("PluginLifecycle", "Callback skipped: buffer manager missing", {
+              hook: "message_received",
+            });
           }
         });
       });
 
       api.on("message_sent", (event: unknown, context?: unknown) => {
         runHookSafely(logger, "message_sent", () => {
+          logger.debug("PluginLifecycle", "Callback invoked", {
+            hook: "message_sent",
+            hasContext: context !== undefined,
+            hasBufferManager: Boolean(bufferManager),
+          });
+
           if (bufferManager) {
             handleMessageSent(
               event,
@@ -284,6 +303,13 @@ export default function activate(api: PluginAPI): void {
               fileCurator,
               config.memoryGate.windowSize
             );
+            logger.debug("PluginLifecycle", "Callback completed", {
+              hook: "message_sent",
+            });
+          } else {
+            logger.warn("PluginLifecycle", "Callback skipped: buffer manager missing", {
+              hook: "message_sent",
+            });
           }
         });
       });
