@@ -1,6 +1,20 @@
 import type { Logger } from "../types.js";
 import { MEMORY_GATE_SYSTEM_PROMPT } from "./prompt.js";
-import type { LLMClient, MemoryGateInput, MemoryGateOutput } from "./types.js";
+import type {
+  LLMClient,
+  MemoryDecision,
+  MemoryGateInput,
+  MemoryGateOutput,
+} from "./types.js";
+
+const VALID_DECISIONS: ReadonlySet<MemoryDecision> = new Set([
+  "NO_WRITE",
+  "WRITE_DAILY",
+  "UPDATE_MEMORY",
+  "UPDATE_USER",
+  "UPDATE_SOUL",
+  "UPDATE_IDENTITY",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -128,7 +142,7 @@ export class MemoryGateAnalyzer {
             .join("\n");
 
     return [
-      "Evaluate whether this turn should be recorded to daily memory.",
+      "Evaluate whether this turn should update memory files.",
       "",
       "Recent messages (oldest to newest):",
       recentMessagesBlock,
@@ -192,7 +206,7 @@ export class MemoryGateAnalyzer {
     }
 
     const decision = parsed.decision;
-    if (decision !== "NO_WRITE" && decision !== "WRITE_DAILY") {
+    if (typeof decision !== "string" || !VALID_DECISIONS.has(decision as MemoryDecision)) {
       return {
         decision: "NO_WRITE",
         reason: "Invalid decision returned by memory gate",
@@ -203,17 +217,25 @@ export class MemoryGateAnalyzer {
     const candidateFact =
       getNonEmptyString(parsed.candidate_fact) ??
       getNonEmptyString(parsed.candidateFact);
+    const normalizedDecision = decision as MemoryDecision;
 
-    if (decision === "WRITE_DAILY" && candidateFact) {
+    if (normalizedDecision !== "NO_WRITE" && !candidateFact) {
       return {
-        decision,
+        decision: "NO_WRITE",
+        reason: "Missing candidate_fact for non-NO_WRITE decision",
+      };
+    }
+
+    if (candidateFact) {
+      return {
+        decision: normalizedDecision,
         reason,
         candidateFact,
       };
     }
 
     return {
-      decision,
+      decision: normalizedDecision,
       reason,
     };
   }

@@ -3,6 +3,7 @@ import * as url from "url";
 import { parseConfig } from "./config.js";
 import { ConsolidationScheduler } from "./consolidation/index.js";
 import { DailyWriter } from "./daily-writer/index.js";
+import { FileCurator } from "./file-curator/index.js";
 import { FileLogger } from "./logger.js";
 import {
   MemoryGateAnalyzer,
@@ -176,28 +177,28 @@ export default function activate(api: PluginAPI): void {
     const __dirname = path.dirname(__filename);
     const pluginRootDir = path.resolve(__dirname, "..");
 
-    const runtimeFileLogger = new FileLogger(pluginRootDir, config.logLevel);
-    fileLogger = runtimeFileLogger;
+    const logger = new FileLogger(pluginRootDir, config.logLevel);
+    fileLogger = logger;
 
     gatewayLogger.info("[Reflection] Plugin starting...");
-    runtimeFileLogger.info("PluginLifecycle", "Plugin starting");
+    logger.info("PluginLifecycle", "Plugin starting");
 
     gatewayLogger.info("[Reflection] Configuration loaded", {
       bufferSize: config.bufferSize,
       logLevel: config.logLevel,
     });
-    runtimeFileLogger.info("PluginLifecycle", "Configuration loaded", {
+    logger.info("PluginLifecycle", "Configuration loaded", {
       bufferSize: config.bufferSize,
       logLevel: config.logLevel,
     });
 
     gatewayLogger.info("[Reflection] File logger initialized");
-    runtimeFileLogger.info("PluginLifecycle", "File logger initialized");
+    logger.info("PluginLifecycle", "File logger initialized");
 
-    bufferManager = new SessionBufferManager(config.bufferSize, runtimeFileLogger);
+    bufferManager = new SessionBufferManager(config.bufferSize, logger);
 
     gatewayLogger.info("[Reflection] SessionBufferManager initialized");
-    runtimeFileLogger.info("PluginLifecycle", "SessionBufferManager initialized", {
+    logger.info("PluginLifecycle", "SessionBufferManager initialized", {
       bufferSize: config.bufferSize,
     });
 
@@ -206,29 +207,35 @@ export default function activate(api: PluginAPI): void {
 
     let memoryGate: MemoryGateAnalyzer | undefined;
     let dailyWriter: DailyWriter | undefined;
+    let fileCurator: FileCurator | undefined;
 
     if (config.memoryGate.enabled) {
       const llmClient = createLLMClient(
         api,
         config.memoryGate.model,
-        runtimeFileLogger
+        logger
       );
-      memoryGate = new MemoryGateAnalyzer(llmClient, runtimeFileLogger);
-      runtimeFileLogger.info("PluginLifecycle", "MemoryGateAnalyzer initialized", {
+      memoryGate = new MemoryGateAnalyzer(llmClient, logger);
+      logger.info("PluginLifecycle", "MemoryGateAnalyzer initialized", {
         model: config.memoryGate.model,
       });
     } else {
-      runtimeFileLogger.info("PluginLifecycle", "MemoryGateAnalyzer disabled");
+      logger.info("PluginLifecycle", "MemoryGateAnalyzer disabled");
     }
 
     if (config.dailyWriter.enabled) {
-      dailyWriter = new DailyWriter({ memoryDir }, runtimeFileLogger);
-      runtimeFileLogger.info("PluginLifecycle", "DailyWriter initialized", {
+      dailyWriter = new DailyWriter({ memoryDir }, logger);
+      logger.info("PluginLifecycle", "DailyWriter initialized", {
         memoryDir,
       });
     } else {
-      runtimeFileLogger.info("PluginLifecycle", "DailyWriter disabled");
+      logger.info("PluginLifecycle", "DailyWriter disabled");
     }
+
+    fileCurator = new FileCurator({ workspaceDir }, logger);
+    logger.info("PluginLifecycle", "FileCurator initialized", {
+      workspaceDir,
+    });
 
     if (config.consolidation.enabled) {
       const consolidationScheduler = new ConsolidationScheduler(
@@ -238,12 +245,12 @@ export default function activate(api: PluginAPI): void {
           schedule: config.consolidation.schedule,
           minDailyEntries: config.consolidation.minDailyEntries,
         },
-        runtimeFileLogger
+        logger
       );
 
       consolidationScheduler.start();
 
-      runtimeFileLogger.info(
+      logger.info(
         "PluginLifecycle",
         "ConsolidationScheduler initialized and started",
         {
@@ -252,28 +259,29 @@ export default function activate(api: PluginAPI): void {
         }
       );
     } else {
-      runtimeFileLogger.info("PluginLifecycle", "ConsolidationScheduler disabled");
+      logger.info("PluginLifecycle", "ConsolidationScheduler disabled");
     }
 
     if (typeof api.on === "function") {
       api.on("message_received", (event: unknown, context?: unknown) => {
-        runHookSafely(runtimeFileLogger, "message_received", () => {
+        runHookSafely(logger, "message_received", () => {
           if (bufferManager) {
-            handleMessageReceived(event, bufferManager, runtimeFileLogger, context);
+            handleMessageReceived(event, bufferManager, logger, context);
           }
         });
       });
 
       api.on("message_sent", (event: unknown, context?: unknown) => {
-        runHookSafely(runtimeFileLogger, "message_sent", () => {
+        runHookSafely(logger, "message_sent", () => {
           if (bufferManager) {
             handleMessageSent(
               event,
               bufferManager,
-              runtimeFileLogger,
+              logger,
               context,
               memoryGate,
               dailyWriter,
+              fileCurator,
               config.memoryGate.windowSize
             );
           }
@@ -281,18 +289,18 @@ export default function activate(api: PluginAPI): void {
       });
 
       gatewayLogger.info("[Reflection] Typed message hooks registered");
-      runtimeFileLogger.info("PluginLifecycle", "Typed message hooks registered");
+      logger.info("PluginLifecycle", "Typed message hooks registered");
     }
 
     api.registerHook(
       "command:new",
       (event: unknown, context?: unknown) => {
-        runHookSafely(runtimeFileLogger, "command:new", () => {
+        runHookSafely(logger, "command:new", () => {
           if (bufferManager) {
             handleSessionEnd(
               event,
               bufferManager,
-              runtimeFileLogger,
+              logger,
               "command:new",
               context
             );
@@ -305,12 +313,12 @@ export default function activate(api: PluginAPI): void {
     api.registerHook(
       "command:reset",
       (event: unknown, context?: unknown) => {
-        runHookSafely(runtimeFileLogger, "command:reset", () => {
+        runHookSafely(logger, "command:reset", () => {
           if (bufferManager) {
             handleSessionEnd(
               event,
               bufferManager,
-              runtimeFileLogger,
+              logger,
               "command:reset",
               context
             );
@@ -324,7 +332,7 @@ export default function activate(api: PluginAPI): void {
     gatewayLogger.info(
       "[Reflection] Plugin registered successfully, all hooks active"
     );
-    runtimeFileLogger.info(
+    logger.info(
       "PluginLifecycle",
       "Plugin registered successfully, all hooks active"
     );
@@ -340,6 +348,7 @@ export { parseConfig } from "./config.js";
 export { FileLogger } from "./logger.js";
 export { SessionBufferManager } from "./session-manager.js";
 export { DailyWriter } from "./daily-writer/index.js";
+export { FileCurator } from "./file-curator/index.js";
 export { MemoryGateAnalyzer, MEMORY_GATE_SYSTEM_PROMPT } from "./memory-gate/index.js";
 export { Consolidator, ConsolidationScheduler } from "./consolidation/index.js";
 export {

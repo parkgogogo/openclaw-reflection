@@ -18,4 +18,5 @@ export interface DailyEntry {
   time: string;
   context: string;
   decisions: string[];
+  next: string[];
 }

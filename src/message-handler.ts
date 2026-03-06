@@ -2,6 +2,7 @@ import type { SessionBufferManager } from "./session-manager.js";
 import type { Logger, ReflectionMessage } from "./types.js";
 import { MemoryGateAnalyzer, type MemoryGateOutput } from "./memory-gate/index.js";
 import { DailyWriter } from "./daily-writer/index.js";
+import { FileCurator } from "./file-curator/index.js";
 import { ulid } from "ulid";
 
 const DEFAULT_MEMORY_GATE_WINDOW_SIZE = 10;
@@ -230,11 +231,23 @@ function findLatestMessageByRole(
   return "";
 }
 
+function isUpdateDecision(
+  decision: MemoryGateOutput["decision"]
+): decision is "UPDATE_MEMORY" | "UPDATE_USER" | "UPDATE_SOUL" | "UPDATE_IDENTITY" {
+  return (
+    decision === "UPDATE_MEMORY" ||
+    decision === "UPDATE_USER" ||
+    decision === "UPDATE_SOUL" ||
+    decision === "UPDATE_IDENTITY"
+  );
+}
+
 async function triggerMemoryGate(
   sessionKey: string,
   bufferManager: SessionBufferManager,
   memoryGate: MemoryGateAnalyzer,
-  dailyWriter: DailyWriter,
+  dailyWriter: DailyWriter | undefined,
+  fileCurator: FileCurator | undefined,
   logger: Logger,
   memoryGateWindowSize: number
 ): Promise<void> {
@@ -273,15 +286,47 @@ async function triggerMemoryGate(
     );
 
     if (output.decision === "WRITE_DAILY") {
-      await dailyWriter.write(output);
-      logger.info(
-        "MessageHandler",
-        "Daily writer triggered by memory gate",
-        {
-          decision: output.decision,
-        },
-        sessionKey
-      );
+      if (dailyWriter) {
+        await dailyWriter.write(output);
+        logger.info(
+          "MessageHandler",
+          "Daily writer triggered by memory gate",
+          {
+            decision: output.decision,
+          },
+          sessionKey
+        );
+      } else {
+        logger.warn(
+          "MessageHandler",
+          "WRITE_DAILY skipped because DailyWriter is unavailable",
+          {
+            decision: output.decision,
+          },
+          sessionKey
+        );
+      }
+    } else if (isUpdateDecision(output.decision)) {
+      if (fileCurator) {
+        await fileCurator.write(output);
+        logger.info(
+          "MessageHandler",
+          "File curator triggered by memory gate",
+          {
+            decision: output.decision,
+          },
+          sessionKey
+        );
+      } else {
+        logger.warn(
+          "MessageHandler",
+          "UPDATE_* skipped because FileCurator is unavailable",
+          {
+            decision: output.decision,
+          },
+          sessionKey
+        );
+      }
     }
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -353,6 +398,7 @@ export function handleMessageSent(
   hookContext?: unknown,
   memoryGate?: MemoryGateAnalyzer,
   dailyWriter?: DailyWriter,
+  fileCurator?: FileCurator,
   memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
 ): void {
   const normalizedEvent = normalizeMessageEvent(event, hookContext);
@@ -395,12 +441,13 @@ export function handleMessageSent(
 
   bufferManager.push(sessionKey, message);
 
-  if (memoryGate && dailyWriter) {
+  if (memoryGate && (dailyWriter || fileCurator)) {
     void triggerMemoryGate(
       sessionKey,
       bufferManager,
       memoryGate,
       dailyWriter,
+      fileCurator,
       logger,
       memoryGateWindowSize
     );

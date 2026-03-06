@@ -6,6 +6,7 @@ import {
   appendFileWithLock,
   ensureDir,
   getTodayFilename,
+  readFile,
 } from "../utils/file-utils.js";
 
 interface DailyWriterConfig {
@@ -16,6 +17,7 @@ interface WriteTask {
   id: string;
   filePath: string;
   content: string;
+  factSignature: string;
   retries: number;
   maxRetries: number;
 }
@@ -37,6 +39,50 @@ function getErrorMessage(error: unknown): string {
   }
 
   return String(error);
+}
+
+function normalizeText(value: string): string {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function extractDecisionsFromDaily(content: string): string[] {
+  const lines = content.split(/\r?\n/);
+  const decisions: string[] = [];
+  let inDecisions = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (/^##\s+\[.+\]\s*$/.test(trimmed)) {
+      inDecisions = false;
+      continue;
+    }
+
+    if (trimmed === "Decisions:") {
+      inDecisions = true;
+      continue;
+    }
+
+    if (trimmed === "Context:" || trimmed === "Next:") {
+      inDecisions = false;
+      continue;
+    }
+
+    if (!inDecisions || !trimmed.startsWith("- ")) {
+      continue;
+    }
+
+    const decision = normalizeText(trimmed.slice(2));
+    if (decision !== "") {
+      decisions.push(decision);
+    }
+  }
+
+  return decisions;
+}
+
+function shouldIncludeNextSection(candidateFact: string): boolean {
+  return /\b(next|todo|follow[- ]?up|tomorrow|later|after)\b/i.test(candidateFact);
 }
 
 export class DailyWriter {
@@ -94,6 +140,22 @@ export class DailyWriter {
 
         try {
           await ensureDir(this.config.memoryDir);
+
+          const existingContent = await readFile(task.filePath);
+          if (typeof existingContent === "string") {
+            const existingFacts = extractDecisionsFromDaily(existingContent);
+            if (existingFacts.includes(task.factSignature)) {
+              this.writeQueue.shift();
+              this.settleTaskSuccess(task.id);
+
+              this.logger.info("DailyWriter", "Skipped duplicate daily fact", {
+                taskId: task.id,
+                filePath: task.filePath,
+              });
+              continue;
+            }
+          }
+
           await appendFileWithLock(task.filePath, task.content);
           this.writeQueue.shift();
           this.settleTaskSuccess(task.id);
@@ -146,20 +208,36 @@ export class DailyWriter {
         return;
       }
 
+      const candidateFact = output.candidateFact?.trim();
+      if (!candidateFact) {
+        this.logger.warn("DailyWriter", "Skip WRITE_DAILY without candidate fact", {
+          reason: output.reason,
+        });
+        return;
+      }
+
       const now = new Date();
       const dailyFilePath = path.join(this.config.memoryDir, getTodayFilename());
-      const candidateFact = output.candidateFact ?? "No candidate fact provided";
-      const entry =
-        `## [${formatTime(now)}]\n` +
-        "Context:\n" +
-        `- ${output.reason}\n\n` +
-        "Decisions:\n" +
-        `- ${candidateFact}\n\n`;
+      const sections: string[] = [
+        `## [${formatTime(now)}]`,
+        "Context:",
+        `- ${output.reason.trim() || "N/A"}`,
+        "",
+        "Decisions:",
+        `- ${candidateFact}`,
+      ];
+
+      if (shouldIncludeNextSection(candidateFact)) {
+        sections.push("", "Next:", `- ${candidateFact}`);
+      }
+
+      const entry = `${sections.join("\n")}\n\n`;
 
       const task: WriteTask = {
         id: randomUUID(),
         filePath: dailyFilePath,
         content: entry,
+        factSignature: normalizeText(candidateFact),
         retries: 0,
         maxRetries: 3,
       };

@@ -51,7 +51,13 @@ export interface LogEntry {
   details?: Record<string, unknown>;
 }
 
-export type MemoryDecision = "NO_WRITE" | "WRITE_DAILY";
+export type MemoryDecision =
+  | "NO_WRITE"
+  | "WRITE_DAILY"
+  | "UPDATE_MEMORY"
+  | "UPDATE_USER"
+  | "UPDATE_SOUL"
+  | "UPDATE_IDENTITY";
 
 export interface MemoryGateOutput {
   decision: MemoryDecision;

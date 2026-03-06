@@ -14,11 +14,13 @@ import type {
 
 const DAILY_FILE_PATTERN = /^\d{4}-\d{2}-\d{2}\.md$/;
 const ARCHIVE_AFTER_DAYS = 7;
+const RECENT_DAILY_FILES = 2;
 const MANAGED_START = "<!-- reflection-plugin:consolidated:start -->";
 const MANAGED_END = "<!-- reflection-plugin:consolidated:end -->";
-const MAX_MEMORY_FACTS = 100;
-const MAX_USER_FACTS = 40;
-const MAX_SOUL_FACTS = 40;
+const MAX_MEMORY_FACTS = 50;
+const MAX_USER_FACTS = 20;
+const MAX_SOUL_FACTS = 20;
+const MIN_STABLE_OCCURRENCES = 2;
 
 interface ParsedDailyEntry extends DailyEntry {
   date: string;
@@ -79,13 +81,13 @@ function normalizeFact(value: string): string {
 }
 
 function isUserFact(value: string): boolean {
-  return /(user|preference|habit|goal|plan|request|need|用户|偏好|习惯|目标|计划|需求|想要|希望|我)/i.test(
+  return /(preference|habit|timezone|language|work style|red line|dislike|偏好|习惯|时区|语言|工作风格|红线|反感|喜欢|不喜欢)/i.test(
     value
   );
 }
 
 function isSoulFact(value: string): boolean {
-  return /(assistant|agent|style|tone|workflow|principle|constraint|policy|助手|风格|语气|工作流|原则|约束|策略|回复方式)/i.test(
+  return /(principle|boundary|value|tone|style|constraint|policy|人格|独立|原则|边界|价值排序|语气|风格|约束|关系模型|回复方式)/i.test(
     value
   );
 }
@@ -115,14 +117,18 @@ function parseDailyEntries(content: string): DailyEntry[] {
   const entries: DailyEntry[] = [];
 
   let currentEntry: DailyEntry | null = null;
-  let activeSection: "context" | "decisions" | null = null;
+  let activeSection: "context" | "decisions" | "next" | null = null;
 
   const flushCurrentEntry = (): void => {
     if (!currentEntry) {
       return;
     }
 
-    if (currentEntry.context !== "" || currentEntry.decisions.length > 0) {
+    if (
+      currentEntry.context !== "" ||
+      currentEntry.decisions.length > 0 ||
+      currentEntry.next.length > 0
+    ) {
       entries.push(currentEntry);
     }
 
@@ -140,6 +146,7 @@ function parseDailyEntries(content: string): DailyEntry[] {
         time: headingMatch[1],
         context: "",
         decisions: [],
+        next: [],
       };
       continue;
     }
@@ -155,6 +162,11 @@ function parseDailyEntries(content: string): DailyEntry[] {
 
     if (trimmed === "Decisions:") {
       activeSection = "decisions";
+      continue;
+    }
+
+    if (trimmed === "Next:") {
+      activeSection = "next";
       continue;
     }
 
@@ -180,6 +192,11 @@ function parseDailyEntries(content: string): DailyEntry[] {
 
     if (activeSection === "decisions") {
       currentEntry.decisions.push(bulletValue);
+      continue;
+    }
+
+    if (activeSection === "next") {
+      currentEntry.next.push(bulletValue);
     }
   }
 
@@ -200,16 +217,22 @@ export class Consolidator {
   async consolidate(): Promise<ConsolidationResult> {
     const dailyFiles = await this.getDailyFiles();
     const archived = await this.archiveOldFiles(dailyFiles);
-    const activeDailyFiles = dailyFiles.filter((file) => !archived.includes(file));
+    const activeDailyFiles = dailyFiles
+      .filter((file) => !archived.includes(file))
+      .sort();
+    const scopedDailyFiles = activeDailyFiles.slice(-RECENT_DAILY_FILES);
+    const parsedEntries = await this.parseDailyFiles(scopedDailyFiles);
 
-    if (activeDailyFiles.length < this.config.minDailyEntries) {
+    if (parsedEntries.length < this.config.minDailyEntries) {
       this.logger.info(
         "Consolidator",
-        "Skipped updates: insufficient active daily entries",
+        "Skipped updates: insufficient recent daily entries",
         {
           totalDailyFiles: dailyFiles.length,
           activeDailyFiles: activeDailyFiles.length,
+          scopedDailyFiles: scopedDailyFiles.length,
           archivedCount: archived.length,
+          parsedEntries: parsedEntries.length,
           minDailyEntries: this.config.minDailyEntries,
         }
       );
@@ -220,13 +243,13 @@ export class Consolidator {
       };
     }
 
-    const parsedEntries = await this.parseDailyFiles(activeDailyFiles);
     const updates = await this.generateUpdates(parsedEntries);
     await this.writeUpdates(updates);
 
     this.logger.info("Consolidator", "Consolidation run completed", {
       totalDailyFiles: dailyFiles.length,
       activeDailyFiles: activeDailyFiles.length,
+      scopedDailyFiles: scopedDailyFiles.length,
       archivedCount: archived.length,
       parsedEntries: parsedEntries.length,
       updatedFiles: Object.keys(updates),
@@ -302,6 +325,7 @@ export class Consolidator {
             time: normalizeWhitespace(entry.time),
             context: normalizeWhitespace(entry.context),
             decisions: entry.decisions.map((decision) => normalizeWhitespace(decision)),
+            next: entry.next.map((item) => normalizeWhitespace(item)),
           });
         }
       } catch (error) {
@@ -316,7 +340,7 @@ export class Consolidator {
     return parsed;
   }
 
-  private collectFactRecords(entries: ParsedDailyEntry[]): FactRecord[] {
+  private collectChronologicalFacts(entries: ParsedDailyEntry[]): FactRecord[] {
     const chronologicalFacts: FactRecord[] = [];
 
     for (const entry of entries) {
@@ -331,13 +355,29 @@ export class Consolidator {
           fact: decision,
         });
       }
+
+      for (const nextItem of entry.next) {
+        if (nextItem === "") {
+          continue;
+        }
+
+        chronologicalFacts.push({
+          date: entry.date,
+          time: entry.time,
+          fact: nextItem,
+        });
+      }
     }
 
+    return chronologicalFacts;
+  }
+
+  private dedupeByLatest(records: FactRecord[]): FactRecord[] {
     const seenFacts = new Set<string>();
     const dedupedReversed: FactRecord[] = [];
 
-    for (let index = chronologicalFacts.length - 1; index >= 0; index -= 1) {
-      const fact = chronologicalFacts[index];
+    for (let index = records.length - 1; index >= 0; index -= 1) {
+      const fact = records[index];
       const normalized = normalizeFact(fact.fact);
 
       if (normalized === "" || seenFacts.has(normalized)) {
@@ -352,6 +392,36 @@ export class Consolidator {
     return dedupedReversed;
   }
 
+  private collectFactRecords(entries: ParsedDailyEntry[]): FactRecord[] {
+    return this.dedupeByLatest(this.collectChronologicalFacts(entries));
+  }
+
+  private collectStableFactRecords(
+    entries: ParsedDailyEntry[],
+    predicate: (value: string) => boolean
+  ): FactRecord[] {
+    const allFacts = this.collectChronologicalFacts(entries).filter(
+      (record) => record.fact !== "" && predicate(record.fact)
+    );
+    const occurrences = new Map<string, number>();
+
+    for (const record of allFacts) {
+      const key = normalizeFact(record.fact);
+      if (key === "") {
+        continue;
+      }
+
+      occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
+    }
+
+    const stableFacts = allFacts.filter((record) => {
+      const key = normalizeFact(record.fact);
+      return (occurrences.get(key) ?? 0) >= MIN_STABLE_OCCURRENCES;
+    });
+
+    return this.dedupeByLatest(stableFacts);
+  }
+
   private async generateUpdates(
     entries: ParsedDailyEntry[]
   ): Promise<ConsolidationResult["updates"]> {
@@ -363,12 +433,10 @@ export class Consolidator {
     }
 
     const memoryLines = facts.slice(-MAX_MEMORY_FACTS).map(formatFactLine);
-    const userLines = facts
-      .filter((fact) => isUserFact(fact.fact))
+    const userLines = this.collectStableFactRecords(entries, isUserFact)
       .slice(-MAX_USER_FACTS)
       .map(formatFactLine);
-    const soulLines = facts
-      .filter((fact) => isSoulFact(fact.fact))
+    const soulLines = this.collectStableFactRecords(entries, isSoulFact)
       .slice(-MAX_SOUL_FACTS)
       .map(formatFactLine);
 
