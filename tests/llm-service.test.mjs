@@ -131,32 +131,24 @@ test("LLMService generateObject rejects invalid schema output", async () => {
   );
 });
 
-test("LLMService runAgent executes read then write tools", async () => {
+test("LLMService runAgent executes read then write tools via function calls", async () => {
   const responses = [
     {
       choices: [
         {
           message: {
-            content: JSON.stringify({
-              action: "tool",
-              tool_name: "read",
-              tool_input: {},
-            }),
-          },
-        },
-      ],
-    },
-    {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              action: "tool",
-              tool_name: "write",
-              tool_input: {
-                content: "# USER\n\n## Preferences\n- prefers direct feedback\n",
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_read",
+                type: "function",
+                function: {
+                  name: "read",
+                  arguments: "{}",
+                },
               },
-            }),
+            ],
           },
         },
       ],
@@ -165,10 +157,30 @@ test("LLMService runAgent executes read then write tools", async () => {
       choices: [
         {
           message: {
-            content: JSON.stringify({
-              action: "finish",
-              message: "updated",
-            }),
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_write",
+                type: "function",
+                function: {
+                  name: "write",
+                  arguments: JSON.stringify({
+                    content: "# USER\n\n## Preferences\n- prefers direct feedback\n",
+                  }),
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content: "updated",
           },
         },
       ],
@@ -177,6 +189,7 @@ test("LLMService runAgent executes read then write tools", async () => {
 
   let readCalls = 0;
   const writes = [];
+  const calls = [];
   const service = new LLMService(
     {
       baseURL: "https://example.com/v1",
@@ -184,7 +197,8 @@ test("LLMService runAgent executes read then write tools", async () => {
       model: "gpt-test",
     },
     {
-      async fetch() {
+      async fetch(_url, init) {
+        calls.push(JSON.parse(init.body));
         const next = responses.shift();
         if (!next) {
           throw new Error("No more mock responses");
@@ -237,9 +251,18 @@ test("LLMService runAgent executes read then write tools", async () => {
   ]);
   assert.equal(result.didWrite, true);
   assert.equal(result.steps.filter((step) => step.type === "tool").length, 2);
+
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].tool_choice, "auto");
+  assert.equal(calls[0].tools.length, 2);
+  assert.equal(calls[0].tools[0].type, "function");
+  assert.equal(calls[0].messages.length, 2);
+  assert.equal(calls[1].messages[3].role, "tool");
+  assert.equal(calls[2].messages[5].role, "tool");
 });
 
 test("LLMService runAgent returns didWrite=false when no write tool is called", async () => {
+  const calls = [];
   const service = new LLMService(
     {
       baseURL: "https://example.com/v1",
@@ -247,15 +270,14 @@ test("LLMService runAgent returns didWrite=false when no write tool is called", 
       model: "gpt-test",
     },
     {
-      async fetch() {
+      async fetch(_url, init) {
+        calls.push(JSON.parse(init.body));
         return createJSONResponse({
           choices: [
             {
               message: {
-                content: JSON.stringify({
-                  action: "finish",
-                  message: "refuse write",
-                }),
+                role: "assistant",
+                content: "refuse write",
               },
             },
           ],
@@ -301,4 +323,160 @@ test("LLMService runAgent returns didWrite=false when no write tool is called", 
 
   assert.equal(result.didWrite, false);
   assert.equal(result.steps.filter((step) => step.type === "tool").length, 0);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].tools.length, 2);
+  assert.equal(calls[0].tool_choice, "auto");
+});
+
+test("LLMService runAgent handles toolChoice 'none' without sending tools", async () => {
+  const calls = [];
+  const service = new LLMService(
+    {
+      baseURL: "https://example.com/v1",
+      apiKey: "test-key",
+      model: "gpt-test",
+    },
+    {
+      async fetch(_url, init) {
+        calls.push(JSON.parse(init.body));
+        return createJSONResponse({
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: "I will not use any tools",
+              },
+            },
+          ],
+        });
+      },
+    }
+  );
+
+  const result = await service.runAgent({
+    systemPrompt: "You are a helpful assistant",
+    userPrompt: "Say hello without using tools",
+    maxSteps: 3,
+    toolChoice: "none",
+    tools: [
+      {
+        name: "read",
+        description: "Read a file",
+        inputSchema: { type: "object", properties: {} },
+        async execute() {
+          return "content";
+        },
+      },
+    ],
+  });
+
+  assert.equal(result.finalMessage, "I will not use any tools");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].tools, undefined);
+  assert.equal(calls[0].tool_choice, undefined);
+});
+
+test("LLMService runAgent handles tool errors gracefully", async () => {
+  const calls = [];
+  const service = new LLMService(
+    {
+      baseURL: "https://example.com/v1",
+      apiKey: "test-key",
+      model: "gpt-test",
+    },
+    {
+      async fetch(_url, init) {
+        calls.push(JSON.parse(init.body));
+        return createJSONResponse({
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: null,
+                tool_calls: [
+                  {
+                    id: "call_fail",
+                    type: "function",
+                    function: {
+                      name: "failingTool",
+                      arguments: "{}",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        });
+      },
+    }
+  );
+
+  const result = await service.runAgent({
+    systemPrompt: "Test error handling",
+    userPrompt: "Call the failing tool",
+    maxSteps: 1,
+    tools: [
+      {
+        name: "failingTool",
+        description: "A tool that always fails",
+        inputSchema: { type: "object", properties: {} },
+        async execute() {
+          throw new Error("Tool execution failed!");
+        },
+      },
+    ],
+  });
+
+  const toolStep = result.steps.find((s) => s.type === "tool");
+  assert.ok(toolStep);
+  assert.ok(toolStep.toolOutput.includes("Error executing tool"));
+  assert.ok(toolStep.toolOutput.includes("Tool execution failed!"));
+});
+
+test("LLMService runAgent handles unknown tool requests gracefully", async () => {
+  const calls = [];
+  const service = new LLMService(
+    {
+      baseURL: "https://example.com/v1",
+      apiKey: "test-key",
+      model: "gpt-test",
+    },
+    {
+      async fetch(_url, init) {
+        calls.push(JSON.parse(init.body));
+        return createJSONResponse({
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: null,
+                tool_calls: [
+                  {
+                    id: "call_unknown",
+                    type: "function",
+                    function: {
+                      name: "nonExistentTool",
+                      arguments: "{}",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        });
+      },
+    }
+  );
+
+  const result = await service.runAgent({
+    systemPrompt: "Test unknown tool",
+    userPrompt: "Call a tool",
+    maxSteps: 1,
+    tools: [],
+  });
+
+  const toolStep = result.steps.find((s) => s.type === "tool");
+  assert.ok(toolStep);
+  assert.ok(toolStep.toolOutput.includes("Unknown tool"));
+  assert.equal(toolStep.toolName, "nonExistentTool");
 });

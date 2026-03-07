@@ -39,6 +39,14 @@ export interface RunAgentParams {
   userPrompt: string;
   tools: AgentTool[];
   maxSteps: number;
+  /**
+   * Controls which (if any) tool the model should use.
+   * - "auto": model can choose to use tools or not (default)
+   * - "none": model should not use any tools
+   * - "required": model must use at least one tool
+   * - { type: "function", function: { name: string } }: force specific tool
+   */
+  toolChoice?: "auto" | "none" | "required" | { type: "function"; function: { name: string } };
 }
 
 export interface AgentStep {

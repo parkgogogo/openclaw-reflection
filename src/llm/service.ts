@@ -11,25 +11,56 @@ import type {
   RunAgentParams,
 } from "./types.js";
 
-interface AgentActionTool {
-  action: "tool";
-  tool_name: string;
-  tool_input?: unknown;
+interface ChatCompletionToolCall {
+  id?: string;
+  type?: string;
+  function?: {
+    name?: string;
+    arguments?: string;
+  };
 }
 
-interface AgentActionFinish {
-  action: "finish";
-  message?: string;
+interface ChatCompletionMessage {
+  role?: string;
+  content?: string | null;
+  tool_calls?: ChatCompletionToolCall[];
 }
-
-type AgentAction = AgentActionTool | AgentActionFinish;
 
 interface ChatCompletionResponse {
   choices?: Array<{
-    message?: {
-      content?: string | null;
+    message?: ChatCompletionMessage;
+  }>;
+}
+
+interface ChatCompletionToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: JsonSchema;
+    strict: true;
+  };
+}
+
+interface AgentChatMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_call_id?: string;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: {
+      name: string;
+      arguments: string;
     };
   }>;
+}
+
+interface ParsedToolCall {
+  id: string;
+  name: string;
+  input: unknown;
+  rawArguments: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -131,71 +162,103 @@ function parseStrictJSONObject(text: string): unknown {
   }
 }
 
-function buildAgentLoopPrompt(
-  originalPrompt: string,
-  tools: AgentTool[],
-  steps: AgentStep[]
-): string {
-  const toolDescriptions = tools
-    .map(
-      (tool) =>
-        `- ${tool.name}: ${tool.description}\n  input_schema: ${JSON.stringify(tool.inputSchema)}`
-    )
-    .join("\n");
+function toFunctionTool(tool: AgentTool): ChatCompletionToolDefinition {
+  if (tool.inputSchema.type !== "object") {
+    throw new Error(`Tool ${tool.name} input schema must be object type`);
+  }
 
-  const history =
-    steps.length === 0
-      ? "(no previous steps)"
-      : steps
-          .map((step, index) => {
-            if (step.type === "assistant") {
-              return `${index + 1}. assistant: ${JSON.stringify(step.response)}`;
-            }
-
-            return [
-              `${index + 1}. tool_call: ${step.toolName}`,
-              `tool_input: ${JSON.stringify(step.toolInput ?? {})}`,
-              `tool_output: ${step.toolOutput ?? ""}`,
-            ].join("\n");
-          })
-          .join("\n\n");
-
-  return [
-    originalPrompt,
-    "",
-    "Available tools:",
-    toolDescriptions,
-    "",
-    "Previous steps:",
-    history,
-    "",
-    "Return JSON only using one of these shapes:",
-    '{"action":"tool","tool_name":"read|write","tool_input":{}}',
-    '{"action":"finish","message":"optional summary"}',
-  ].join("\n");
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.inputSchema,
+      strict: true,
+    },
+  };
 }
 
-function normalizeAgentAction(value: unknown): AgentAction {
-  if (!isRecord(value) || typeof value.action !== "string") {
-    throw new Error("Agent response missing action");
+function parseToolCalls(value: unknown): ParsedToolCall[] {
+  if (!Array.isArray(value)) {
+    return [];
   }
 
-  if (value.action === "finish") {
+  return value.map((toolCall, index) => {
+    if (!isRecord(toolCall)) {
+      throw new Error(`Tool call at index ${index} is invalid`);
+    }
+
+    if (typeof toolCall.id !== "string" || toolCall.id.trim() === "") {
+      throw new Error(`Tool call at index ${index} is missing id`);
+    }
+
+    if (toolCall.type !== "function") {
+      throw new Error(`Tool call ${toolCall.id} has unsupported type`);
+    }
+
+    if (!isRecord(toolCall.function) || typeof toolCall.function.name !== "string") {
+      throw new Error(`Tool call ${toolCall.id} is missing function name`);
+    }
+
+    const rawArguments =
+      typeof toolCall.function.arguments === "string" &&
+      toolCall.function.arguments.trim() !== ""
+        ? toolCall.function.arguments
+        : "{}";
+
     return {
-      action: "finish",
-      message: typeof value.message === "string" ? value.message : undefined,
+      id: toolCall.id,
+      name: toolCall.function.name,
+      input: parseStrictJSONObject(rawArguments),
+      rawArguments,
     };
+  });
+}
+
+function extractAgentMessage(response: unknown): {
+  content?: string;
+  toolCalls: ParsedToolCall[];
+  assistantMessage: AgentChatMessage;
+} {
+  if (!isRecord(response)) {
+    throw new Error("Provider returned non-object response");
   }
 
-  if (value.action === "tool" && typeof value.tool_name === "string") {
-    return {
-      action: "tool",
-      tool_name: value.tool_name,
-      tool_input: value.tool_input ?? {},
-    };
+  const parsed = response as ChatCompletionResponse;
+  const message = parsed.choices?.[0]?.message;
+
+  if (!isRecord(message)) {
+    throw new Error("Provider returned empty assistant message");
   }
 
-  throw new Error("Agent response shape is invalid");
+  const content = typeof message.content === "string" ? message.content : undefined;
+  const toolCalls = parseToolCalls(message.tool_calls);
+
+  if (toolCalls.length === 0 && (!content || content.trim() === "")) {
+    throw new Error("Provider returned neither tool calls nor message content");
+  }
+
+  const assistantMessage: AgentChatMessage = {
+    role: "assistant",
+    content: typeof message.content === "string" ? message.content : null,
+  };
+
+  if (toolCalls.length > 0) {
+    assistantMessage.tool_calls = toolCalls.map((toolCall) => ({
+      id: toolCall.id,
+      type: "function",
+      function: {
+        name: toolCall.name,
+        arguments: toolCall.rawArguments,
+      },
+    }));
+  }
+
+  return {
+    content,
+    toolCalls,
+    assistantMessage,
+  };
 }
 
 export class LLMService implements LLMServiceContract {
@@ -234,65 +297,116 @@ export class LLMService implements LLMServiceContract {
     const steps: AgentStep[] = [];
     let didWrite = false;
     const tools = new Map(params.tools.map((tool) => [tool.name, tool]));
+    const toolDefinitions = params.tools.map((tool) => toFunctionTool(tool));
+
+    const messages: AgentChatMessage[] = [
+      {
+        role: "system",
+        content: params.systemPrompt,
+      },
+      {
+        role: "user",
+        content: params.userPrompt,
+      },
+    ];
 
     for (let stepIndex = 0; stepIndex < params.maxSteps; stepIndex += 1) {
-      const parsed = await this.requestJSON({
-        systemPrompt: params.systemPrompt,
-        userPrompt: buildAgentLoopPrompt(params.userPrompt, params.tools, steps),
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          required: ["action"],
-          properties: {
-            action: {
-              type: "string",
-              enum: ["tool", "finish"],
-            },
-            tool_name: { type: "string" },
-            tool_input: {
-              type: "object",
-              properties: {},
-              additionalProperties: true,
-            },
-            message: { type: "string" },
-          },
+      const requestBody: Record<string, unknown> = {
+        model: this.config.model,
+        messages,
+      };
+
+      // Only include tools if toolChoice is not "none"
+      if (params.toolChoice !== "none") {
+        requestBody.tools = toolDefinitions;
+        requestBody.tool_choice = params.toolChoice ?? "auto";
+      }
+
+      const payload = await this.requestCompletion(requestBody);
+
+      const { content, toolCalls, assistantMessage } = extractAgentMessage(payload);
+      steps.push({
+        type: "assistant",
+        response: {
+          content: content ?? null,
+          toolCalls: toolCalls.map((toolCall) => ({
+            id: toolCall.id,
+            name: toolCall.name,
+            input: toolCall.input,
+          })),
         },
-        schemaName: "agent_step",
       });
 
-      const action = normalizeAgentAction(parsed);
-      steps.push({ type: "assistant", response: action });
+      messages.push(assistantMessage);
 
-      if (action.action === "finish") {
+      if (toolCalls.length === 0) {
         return {
           steps,
           didWrite,
-          finalMessage: action.message,
+          finalMessage: content,
         };
       }
 
-      const tool = tools.get(action.tool_name);
-      if (!tool) {
-        throw new Error(`Agent requested unknown tool: ${action.tool_name}`);
-      }
+      for (const toolCall of toolCalls) {
+        const tool = tools.get(toolCall.name);
+        if (!tool) {
+          const errorMsg = `Error: Unknown tool "${toolCall.name}"`;
+          steps.push({
+            type: "tool",
+            toolName: toolCall.name,
+            toolInput: toolCall.input,
+            toolOutput: errorMsg,
+          });
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: errorMsg,
+          });
+          continue;
+        }
 
-      const toolErrors = validateAgainstSchema(action.tool_input ?? {}, tool.inputSchema);
-      if (toolErrors.length > 0) {
-        throw new Error(
-          `Tool input schema validation failed for ${tool.name}: ${toolErrors.join("; ")}`
-        );
-      }
+        const toolErrors = validateAgainstSchema(toolCall.input, tool.inputSchema);
+        if (toolErrors.length > 0) {
+          const errorMsg = `Error: Invalid input for tool "${tool.name}": ${toolErrors.join("; ")}`;
+          steps.push({
+            type: "tool",
+            toolName: tool.name,
+            toolInput: toolCall.input,
+            toolOutput: errorMsg,
+          });
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: errorMsg,
+          });
+          continue;
+        }
 
-      const toolOutput = await tool.execute(action.tool_input ?? {});
-      steps.push({
-        type: "tool",
-        toolName: tool.name,
-        toolInput: action.tool_input ?? {},
-        toolOutput,
-      });
+        let toolOutput: string;
+        try {
+          toolOutput = await tool.execute(toolCall.input);
+        } catch (error) {
+          toolOutput = `Error executing tool "${tool.name}": ${
+            error instanceof Error ? error.message : String(error)
+          }`;
+        }
 
-      if (tool.name === "write") {
-        didWrite = true;
+        steps.push({
+          type: "tool",
+          toolName: tool.name,
+          toolInput: toolCall.input,
+          toolOutput,
+        });
+
+        if (tool.name === "write") {
+          didWrite = true;
+        }
+
+        messages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: toolOutput,
+        });
       }
     }
 
@@ -309,6 +423,33 @@ export class LLMService implements LLMServiceContract {
     schema: JsonSchema;
     schemaName: string;
   }): Promise<unknown> {
+    const payload = await this.requestCompletion({
+      model: this.config.model,
+      messages: [
+        {
+          role: "system",
+          content: params.systemPrompt,
+        },
+        {
+          role: "user",
+          content: params.userPrompt,
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: params.schemaName,
+          strict: true,
+          schema: params.schema,
+        },
+      },
+    });
+
+    const content = extractMessageContent(payload);
+    return parseStrictJSONObject(content);
+  }
+
+  private async requestCompletion(body: Record<string, unknown>): Promise<unknown> {
     const response = await this.fetchImpl(
       `${normalizeBaseURL(this.config.baseURL)}/chat/completions`,
       {
@@ -317,27 +458,7 @@ export class LLMService implements LLMServiceContract {
           "content-type": "application/json",
           authorization: `Bearer ${this.config.apiKey}`,
         },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: [
-            {
-              role: "system",
-              content: params.systemPrompt,
-            },
-            {
-              role: "user",
-              content: params.userPrompt,
-            },
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: params.schemaName,
-              strict: true,
-              schema: params.schema,
-            },
-          },
-        }),
+        body: JSON.stringify(body),
       }
     );
 
@@ -348,8 +469,6 @@ export class LLMService implements LLMServiceContract {
       );
     }
 
-    const payload = (await response.json()) as unknown;
-    const content = extractMessageContent(payload);
-    return parseStrictJSONObject(content);
+    return (await response.json()) as unknown;
   }
 }
