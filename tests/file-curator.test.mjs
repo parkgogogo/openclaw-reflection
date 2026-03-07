@@ -26,7 +26,7 @@ function createLogger() {
   };
 }
 
-test("FileCurator rewrites the whole target file from current raw content", async () => {
+test("FileCurator exposes read and write tools to the writer guardian", async () => {
   const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "reflection-curator-"));
   const userFile = path.join(workspaceDir, "USER.md");
 
@@ -36,35 +36,37 @@ test("FileCurator rewrites the whole target file from current raw content", asyn
     "utf8"
   );
 
-  let calls = 0;
-  let receivedSystemPrompt = "";
-  let receivedPrompt = "";
-  const llmClient = {
-    async complete(prompt, systemPrompt) {
-      calls += 1;
-      receivedPrompt = prompt;
-      receivedSystemPrompt = systemPrompt;
-      return JSON.stringify({
-        should_update: true,
-        file: "USER.md",
-        reason: "new stable preference",
-        next_content: [
-          "# USER",
-          "",
-          "## Preferences",
-          "- existing preference",
-          "- prefer direct technical feedback",
-          "",
-          "## Collaboration",
-          "- prefers concise, direct critique",
-          "",
-        ].join("\n"),
+  let receivedRunAgent = null;
+  const llmService = {
+    async runAgent(params) {
+      receivedRunAgent = params;
+      const readTool = params.tools.find((tool) => tool.name === "read");
+      const writeTool = params.tools.find((tool) => tool.name === "write");
+
+      assert.ok(readTool, "expected read tool to be available");
+      assert.ok(writeTool, "expected write tool to be available");
+
+      const current = await readTool.execute({});
+      assert.match(
+        current,
+        /existing preference/,
+        "expected read tool to expose current file content"
+      );
+
+      await writeTool.execute({
+        content: "# USER\n\n## Preferences\n- existing preference\n- prefer direct technical feedback\n",
       });
+
+      return {
+        didWrite: true,
+        finalMessage: "updated",
+        steps: [],
+      };
     },
   };
 
   try {
-    const curator = new FileCurator({ workspaceDir }, createLogger(), llmClient);
+    const curator = new FileCurator({ workspaceDir }, createLogger(), llmService);
     await curator.write({
       decision: "UPDATE_USER",
       reason: "user clarified preference",
@@ -73,31 +75,16 @@ test("FileCurator rewrites the whole target file from current raw content", asyn
 
     const content = await readFile(userFile, "utf8");
 
-    assert.equal(calls, 1, "expected FileCurator to call the LLM once");
+    assert.ok(receivedRunAgent, "expected FileCurator to delegate to llmService.runAgent");
+    assert.match(
+      receivedRunAgent.systemPrompt,
+      /Writer Guardian/,
+      "expected writer guardian system prompt"
+    );
     assert.equal(
       content,
-      [
-        "# USER",
-        "",
-        "## Preferences",
-        "- existing preference",
-        "- prefer direct technical feedback",
-        "",
-        "## Collaboration",
-        "- prefers concise, direct critique",
-        "",
-      ].join("\n"),
-      "expected FileCurator to overwrite the whole target file with LLM output"
-    );
-    assert.match(
-      receivedSystemPrompt,
-      /USER\.md.*about your human|about your human.*USER\.md/s,
-      "expected unified guardian prompt to encode USER.md semantics"
-    );
-    assert.match(
-      receivedPrompt,
-      /Current file content:\n# USER/,
-      "expected FileCurator to pass raw current file content to the LLM"
+      "# USER\n\n## Preferences\n- existing preference\n- prefer direct technical feedback\n",
+      "expected write tool to overwrite the full target file"
     );
   } finally {
     await rm(workspaceDir, { recursive: true, force: true });
@@ -115,20 +102,18 @@ test("FileCurator logs guardian refusal and leaves the target file untouched", a
     "utf8"
   );
 
-  let calls = 0;
-  const llmClient = {
-    async complete() {
-      calls += 1;
-      return JSON.stringify({
-        should_update: false,
-        file: "SOUL.md",
-        reason: "temporary mood change is not a soul-level update",
-      });
+  const llmService = {
+    async runAgent() {
+      return {
+        didWrite: false,
+        finalMessage: "temporary mood change is not a soul-level update",
+        steps: [],
+      };
     },
   };
 
   try {
-    const curator = new FileCurator({ workspaceDir }, logger, llmClient);
+    const curator = new FileCurator({ workspaceDir }, logger, llmService);
     await curator.write({
       decision: "UPDATE_SOUL",
       reason: "temporary tone change",
@@ -137,7 +122,6 @@ test("FileCurator logs guardian refusal and leaves the target file untouched", a
 
     const content = await readFile(soulFile, "utf8");
 
-    assert.equal(calls, 1, "expected FileCurator to call the LLM once");
     assert.equal(
       content,
       "# SOUL\n\n## Boundaries\n- protect continuity\n",
@@ -155,7 +139,7 @@ test("FileCurator logs guardian refusal and leaves the target file untouched", a
     assert.match(
       refusalLog.meta.reason,
       /temporary mood change/i,
-      "expected refusal log to include curator reason"
+      "expected refusal log to include guardian reason"
     );
   } finally {
     await rm(workspaceDir, { recursive: true, force: true });

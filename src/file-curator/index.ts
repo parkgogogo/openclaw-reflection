@@ -1,5 +1,5 @@
 import * as path from "path";
-import type { LLMClient, MemoryGateOutput, Logger } from "../types.js";
+import type { AgentTool, LLMService, MemoryGateOutput, Logger } from "../types.js";
 import { readFile, writeFileWithLock } from "../utils/file-utils.js";
 
 type UpdateDecision =
@@ -14,21 +14,13 @@ interface FileCuratorConfig {
   workspaceDir: string;
 }
 
-interface CuratorResponse {
-  shouldUpdate: boolean;
-  file: CuratedFilename;
-  reason: string;
-  nextContent?: string;
-}
-
 const FILE_CURATOR_SYSTEM_PROMPT = `You are Lia's Writer Guardian.
 
 Your job:
-- Read the current raw content of exactly one target memory file
-- Understand that file's OpenClaw meaning
-- Decide whether the candidate fact should update that file
-- If yes, rewrite the entire target file content
-- If no, refuse the write
+- Decide whether the candidate fact should update the target memory file
+- Use the read tool if you need the current file content
+- Use the write tool only if the target file truly should change
+- If the target file should not change, finish without calling write
 
 You are a guardian, not an eager writer.
 When in doubt, refuse.
@@ -43,17 +35,9 @@ Hard constraints:
 - Only reason about the target file you were given
 - Do not route to another file
 - Do not read or infer from other files
-- If you refuse, do not propose an alternative destination
-- If you write, preserve the useful existing structure unless there is a strong reason to reorganize
-- Output JSON only
-
-Output schema:
-{
-  "should_update": true,
-  "file": "MEMORY.md|USER.md|SOUL.md|IDENTITY.md",
-  "reason": "why write or refuse",
-  "next_content": "# FULL FILE CONTENT..."
-}`;
+- If you refuse, finish without calling write
+- If you write, overwrite the full target file content
+- Preserve useful existing structure unless there is a strong reason to reorganize`;
 
 const TARGET_FILES: Record<UpdateDecision, CuratedFilename> = {
   UPDATE_MEMORY: "MEMORY.md",
@@ -61,10 +45,6 @@ const TARGET_FILES: Record<UpdateDecision, CuratedFilename> = {
   UPDATE_SOUL: "SOUL.md",
   UPDATE_IDENTITY: "IDENTITY.md",
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 function isUpdateDecision(
   decision: MemoryGateOutput["decision"]
@@ -85,64 +65,6 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-function getNonEmptyString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  return trimmed === "" ? undefined : trimmed;
-}
-
-function extractFirstJSONObject(rawText: string): string | null {
-  let startIndex = -1;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let index = 0; index < rawText.length; index += 1) {
-    const char = rawText[index];
-
-    if (startIndex === -1) {
-      if (char === "{") {
-        startIndex = index;
-        depth = 1;
-      }
-      continue;
-    }
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (char === "{") {
-      depth += 1;
-      continue;
-    }
-
-    if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return rawText.slice(startIndex, index + 1);
-      }
-    }
-  }
-
-  return null;
-}
-
 function getDefaultContent(targetFile: CuratedFilename): string {
   return `# ${targetFile.replace(/\.md$/, "")}\n`;
 }
@@ -155,12 +77,12 @@ function normalizeFileContent(content: string): string {
 export class FileCurator {
   private config: FileCuratorConfig;
   private logger: Logger;
-  private llmClient: LLMClient;
+  private llmService: LLMService;
 
-  constructor(config: FileCuratorConfig, logger: Logger, llmClient: LLMClient) {
+  constructor(config: FileCuratorConfig, logger: Logger, llmService: LLMService) {
     this.config = config;
     this.logger = logger;
-    this.llmClient = llmClient;
+    this.llmService = llmService;
   }
 
   async write(output: MemoryGateOutput): Promise<void> {
@@ -179,43 +101,39 @@ export class FileCurator {
 
     const targetFile = TARGET_FILES[output.decision];
     const filePath = path.join(this.config.workspaceDir, targetFile);
-    const existingContent =
-      (await readFile(filePath)) ?? getDefaultContent(targetFile);
 
-    const response = await this.generateRewrite(
-      output,
-      targetFile,
-      existingContent
-    );
-
-    if (!response.shouldUpdate) {
-      this.logger.info("FileCurator", "Guardian refused update", {
-        decision: output.decision,
-        filePath,
-        reason: response.reason,
-      });
-      return;
-    }
-
-    if (!response.nextContent) {
-      this.logger.warn("FileCurator", "Guardian approved update without content", {
-        decision: output.decision,
-        filePath,
-        reason: response.reason,
-      });
-      return;
-    }
-
-    const nextContent = normalizeFileContent(response.nextContent);
+    const tools = this.createTools(filePath, targetFile);
 
     try {
-      await writeFileWithLock(filePath, nextContent);
+      const result = await this.llmService.runAgent({
+        systemPrompt: FILE_CURATOR_SYSTEM_PROMPT,
+        userPrompt: [
+          `Memory Gate decision: ${output.decision}`,
+          `Reason from gate: ${output.reason}`,
+          `Candidate fact: ${candidateFact}`,
+          `Target file: ${targetFile}`,
+          "",
+          "Decide whether this target file should change. Use read first if you need current content. If the file should change, call write with the full next file content. Otherwise finish without write.",
+        ].join("\n"),
+        tools,
+        maxSteps: 4,
+      });
+
+      if (!result.didWrite) {
+        this.logger.info("FileCurator", "Guardian refused update", {
+          decision: output.decision,
+          filePath,
+          reason: result.finalMessage ?? "Writer guardian finished without write",
+        });
+        return;
+      }
+
       this.logger.info("FileCurator", "Writer guardian rewrote target file", {
         decision: output.decision,
         filePath,
       });
     } catch (error) {
-      this.logger.error("FileCurator", "Failed to rewrite target file", {
+      this.logger.error("FileCurator", "Writer guardian execution failed", {
         decision: output.decision,
         filePath,
         reason: getErrorMessage(error),
@@ -223,114 +141,45 @@ export class FileCurator {
     }
   }
 
-  private async generateRewrite(
-    output: MemoryGateOutput,
-    targetFile: CuratedFilename,
-    existingContent: string
-  ): Promise<CuratorResponse> {
-    const prompt = [
-      `Memory Gate decision: ${output.decision}`,
-      `Candidate fact: ${output.candidateFact ?? "(none)"}`,
-      `Reason from gate: ${output.reason}`,
-      `Target file: ${targetFile}`,
-      "",
-      "Current file content:",
-      existingContent.trim() || "(empty)",
-      "",
-      "Return JSON only as specified in the system prompt.",
-    ].join("\n");
+  private createTools(filePath: string, targetFile: CuratedFilename): AgentTool[] {
+    return [
+      {
+        name: "read",
+        description: `Read the current raw content of ${targetFile}`,
+        inputSchema: {
+          type: "object",
+          properties: {},
+          additionalProperties: false,
+        },
+        execute: async () => (await readFile(filePath)) ?? getDefaultContent(targetFile),
+      },
+      {
+        name: "write",
+        description: `Overwrite ${targetFile} with the provided full content`,
+        inputSchema: {
+          type: "object",
+          properties: {
+            content: { type: "string" },
+          },
+          required: ["content"],
+          additionalProperties: false,
+        },
+        execute: async (input) => {
+          if (
+            typeof input !== "object" ||
+            input === null ||
+            typeof (input as { content?: unknown }).content !== "string"
+          ) {
+            throw new Error("write tool requires string content");
+          }
 
-    try {
-      const response = await this.llmClient.complete(
-        prompt,
-        FILE_CURATOR_SYSTEM_PROMPT
-      );
-      return this.parseResponse(response, targetFile);
-    } catch (error) {
-      const reason = getErrorMessage(error);
-      this.logger.error("FileCurator", "Writer guardian LLM request failed", {
-        decision: output.decision,
-        file: targetFile,
-        reason,
-      });
-      return {
-        shouldUpdate: false,
-        file: targetFile,
-        reason,
-      };
-    }
-  }
-
-  private parseResponse(
-    response: string,
-    targetFile: CuratedFilename
-  ): CuratorResponse {
-    const trimmedResponse = response.trim();
-    const codeFenceMatch = trimmedResponse.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    const candidateTexts: string[] = [];
-
-    if (trimmedResponse !== "") {
-      candidateTexts.push(trimmedResponse);
-    }
-
-    if (codeFenceMatch?.[1]) {
-      candidateTexts.push(codeFenceMatch[1].trim());
-    }
-
-    const firstJsonObject = extractFirstJSONObject(trimmedResponse);
-    if (firstJsonObject) {
-      candidateTexts.push(firstJsonObject.trim());
-    }
-
-    for (const candidate of Array.from(new Set(candidateTexts))) {
-      try {
-        const parsed = JSON.parse(candidate) as unknown;
-        const normalized = this.normalizeResponse(parsed, targetFile);
-        if (normalized) {
-          return normalized;
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    this.logger.warn("FileCurator", "Failed to parse writer guardian response", {
-      file: targetFile,
-      response: trimmedResponse,
-    });
-
-    return {
-      shouldUpdate: false,
-      file: targetFile,
-      reason: "Failed to parse writer guardian response",
-    };
-  }
-
-  private normalizeResponse(
-    parsed: unknown,
-    targetFile: CuratedFilename
-  ): CuratorResponse | undefined {
-    if (!isRecord(parsed)) {
-      return undefined;
-    }
-
-    const shouldUpdate =
-      typeof parsed.should_update === "boolean"
-        ? parsed.should_update
-        : typeof parsed.shouldUpdate === "boolean"
-        ? parsed.shouldUpdate
-        : false;
-
-    const file = getNonEmptyString(parsed.file) === targetFile ? targetFile : targetFile;
-    const reason = getNonEmptyString(parsed.reason) ?? "No reason provided";
-    const nextContent =
-      getNonEmptyString(parsed.next_content) ?? getNonEmptyString(parsed.nextContent);
-
-    return {
-      shouldUpdate,
-      file,
-      reason,
-      nextContent,
-    };
+          await writeFileWithLock(
+            filePath,
+            normalizeFileContent((input as { content: string }).content)
+          );
+          return "ok";
+        },
+      },
+    ];
   }
 }

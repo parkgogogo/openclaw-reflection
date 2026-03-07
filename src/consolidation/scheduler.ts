@@ -1,4 +1,4 @@
-import type { LLMClient, Logger } from "../types.js";
+import type { LLMService, Logger } from "../types.js";
 import { Consolidator } from "./consolidator.js";
 import type { ConsolidationConfig } from "./types.js";
 
@@ -72,10 +72,10 @@ export class ConsolidationScheduler {
   private timeoutId: ReturnType<typeof setTimeout> | null;
   private intervalId: ReturnType<typeof setInterval> | null;
 
-  constructor(config: ConsolidationConfig, logger: Logger, llmClient: LLMClient) {
+  constructor(config: ConsolidationConfig, logger: Logger, llmService: LLMService) {
     this.config = config;
     this.logger = logger;
-    this.consolidator = new Consolidator(config, logger, llmClient);
+    this.consolidator = new Consolidator(config, logger, llmService);
     this.timeoutId = null;
     this.intervalId = null;
   }

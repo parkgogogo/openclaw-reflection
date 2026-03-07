@@ -1,7 +1,6 @@
-import type { Logger } from "../types.js";
+import type { JsonSchema, LLMService, Logger } from "../types.js";
 import { MEMORY_GATE_SYSTEM_PROMPT } from "./prompt.js";
 import type {
-  LLMClient,
   MemoryDecision,
   MemoryGateInput,
   MemoryGateOutput,
@@ -14,10 +13,6 @@ const VALID_DECISIONS: ReadonlySet<MemoryDecision> = new Set([
   "UPDATE_SOUL",
   "UPDATE_IDENTITY",
 ]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 function getNonEmptyString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -36,61 +31,32 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-function extractFirstJSONObject(rawText: string): string | null {
-  let startIndex = -1;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let index = 0; index < rawText.length; index += 1) {
-    const char = rawText[index];
-
-    if (startIndex === -1) {
-      if (char === "{") {
-        startIndex = index;
-        depth = 1;
-      }
-      continue;
-    }
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (char === "{") {
-      depth += 1;
-      continue;
-    }
-
-    if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return rawText.slice(startIndex, index + 1);
-      }
-    }
-  }
-
-  return null;
-}
+const MEMORY_GATE_RESPONSE_SCHEMA: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["decision", "reason"],
+  properties: {
+    decision: {
+      type: "string",
+      enum: [
+        "NO_WRITE",
+        "UPDATE_MEMORY",
+        "UPDATE_USER",
+        "UPDATE_SOUL",
+        "UPDATE_IDENTITY",
+      ],
+    },
+    reason: { type: "string" },
+    candidate_fact: { type: "string" },
+  },
+};
 
 export class MemoryGateAnalyzer {
-  private llmClient: LLMClient;
+  private llmService: LLMService;
   private logger: Logger;
 
-  constructor(llmClient: LLMClient, logger: Logger) {
-    this.llmClient = llmClient;
+  constructor(llmService: LLMService, logger: Logger) {
+    this.llmService = llmService;
     this.logger = logger;
   }
 
@@ -103,10 +69,18 @@ export class MemoryGateAnalyzer {
       hasCurrentAgentReply: input.currentAgentReply.trim() !== "",
     });
 
-    let response: string;
+    let response: {
+      decision: MemoryDecision;
+      reason: string;
+      candidate_fact?: string;
+    };
 
     try {
-      response = await this.llmClient.complete(prompt, MEMORY_GATE_SYSTEM_PROMPT);
+      response = await this.llmService.generateObject({
+        systemPrompt: MEMORY_GATE_SYSTEM_PROMPT,
+        userPrompt: prompt,
+        schema: MEMORY_GATE_RESPONSE_SCHEMA,
+      });
     } catch (error) {
       const reason = `LLM request failed: ${getErrorMessage(error)}`;
       this.logger.error("MemoryGateAnalyzer", "Memory gate LLM request failed", {
@@ -118,7 +92,7 @@ export class MemoryGateAnalyzer {
       };
     }
 
-    const output = this.parseResponse(response);
+    const output = this.normalizeOutput(response);
 
     this.logger.info("MemoryGateAnalyzer", "Memory gate decision generated", {
       decision: output.decision,
@@ -156,56 +130,13 @@ export class MemoryGateAnalyzer {
     ].join("\n");
   }
 
-  parseResponse(response: string): MemoryGateOutput {
-    const trimmedResponse = response.trim();
-    const codeFenceMatch = trimmedResponse.match(/```(?:json)?\s*([\s\S]*?)```/i);
-
-    const candidateTexts: string[] = [];
-
-    if (trimmedResponse !== "") {
-      candidateTexts.push(trimmedResponse);
-    }
-
-    if (codeFenceMatch?.[1]) {
-      candidateTexts.push(codeFenceMatch[1].trim());
-    }
-
-    const firstJsonObject = extractFirstJSONObject(trimmedResponse);
-    if (firstJsonObject) {
-      candidateTexts.push(firstJsonObject.trim());
-    }
-
-    const dedupedCandidates = Array.from(new Set(candidateTexts));
-
-    for (const candidate of dedupedCandidates) {
-      try {
-        const parsed = JSON.parse(candidate) as unknown;
-        const normalized = this.normalizeOutput(parsed);
-        if (normalized) {
-          return normalized;
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    this.logger.warn("MemoryGateAnalyzer", "Failed to parse memory gate response", {
-      response: trimmedResponse,
-    });
-
-    return {
-      decision: "NO_WRITE",
-      reason: "Failed to parse memory gate response as JSON",
-    };
-  }
-
-  private normalizeOutput(parsed: unknown): MemoryGateOutput | null {
-    if (!isRecord(parsed)) {
-      return null;
-    }
-
+  private normalizeOutput(parsed: {
+    decision: MemoryDecision;
+    reason: string;
+    candidate_fact?: string;
+  }): MemoryGateOutput {
     const decision = parsed.decision;
-    if (typeof decision !== "string" || !VALID_DECISIONS.has(decision as MemoryDecision)) {
+    if (!VALID_DECISIONS.has(decision)) {
       return {
         decision: "NO_WRITE",
         reason: "Invalid decision returned by memory gate",
@@ -213,10 +144,8 @@ export class MemoryGateAnalyzer {
     }
 
     const reason = getNonEmptyString(parsed.reason) ?? "No reason provided";
-    const candidateFact =
-      getNonEmptyString(parsed.candidate_fact) ??
-      getNonEmptyString(parsed.candidateFact);
-    const normalizedDecision = decision as MemoryDecision;
+    const candidateFact = getNonEmptyString(parsed.candidate_fact);
+    const normalizedDecision = decision;
 
     if (normalizedDecision !== "NO_WRITE" && !candidateFact) {
       return {

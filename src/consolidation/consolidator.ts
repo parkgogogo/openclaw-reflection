@@ -1,5 +1,5 @@
 import * as path from "path";
-import type { LLMClient, Logger } from "../types.js";
+import type { JsonSchema, LLMService, Logger } from "../types.js";
 import { readFile, writeFileWithLock } from "../utils/file-utils.js";
 import { CONSOLIDATION_SYSTEM_PROMPT } from "./prompt.js";
 import type {
@@ -16,10 +16,62 @@ const VALID_PATCH_ACTIONS = new Set<ConsolidationPatch["action"]>([
   "replace",
   "remove",
 ]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+const CONSOLIDATION_RESPONSE_SCHEMA: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["decision", "proposed_updates"],
+  properties: {
+    decision: {
+      type: "string",
+      enum: ["NO_WRITE", "WRITE_CLEANUP"],
+    },
+    proposed_updates: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        "MEMORY.md": {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["section", "action", "content"],
+            properties: {
+              section: { type: "string" },
+              action: { type: "string", enum: ["add", "replace", "remove"] },
+              content: { type: "string" },
+            },
+          },
+        },
+        "USER.md": {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["section", "action", "content"],
+            properties: {
+              section: { type: "string" },
+              action: { type: "string", enum: ["add", "replace", "remove"] },
+              content: { type: "string" },
+            },
+          },
+        },
+        "SOUL.md": {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["section", "action", "content"],
+            properties: {
+              section: { type: "string" },
+              action: { type: "string", enum: ["add", "replace", "remove"] },
+              content: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+};
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -31,64 +83,6 @@ function getErrorMessage(error: unknown): string {
 
 function stripMdExtension(filename: string): string {
   return filename.endsWith(".md") ? filename.slice(0, -3) : filename;
-}
-
-function getNonEmptyString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  return trimmed === "" ? undefined : trimmed;
-}
-
-function extractFirstJSONObject(rawText: string): string | null {
-  let startIndex = -1;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let index = 0; index < rawText.length; index += 1) {
-    const char = rawText[index];
-
-    if (startIndex === -1) {
-      if (char === "{") {
-        startIndex = index;
-        depth = 1;
-      }
-      continue;
-    }
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (char === "{") {
-      depth += 1;
-      continue;
-    }
-
-    if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return rawText.slice(startIndex, index + 1);
-      }
-    }
-  }
-
-  return null;
 }
 
 function splitContentLines(content: string): string[] {
@@ -161,36 +155,15 @@ function applyPatchToContent(
   return `${[...before, sectionHeader, ...nextBody, ...after].join("\n").trimEnd()}\n`;
 }
 
-function normalizePatch(value: unknown): ConsolidationPatch | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-
-  const section = getNonEmptyString(value.section);
-  const action = getNonEmptyString(value.action) as ConsolidationPatch["action"] | undefined;
-  const content =
-    typeof value.content === "string" ? value.content : "";
-
-  if (!section || !action || !VALID_PATCH_ACTIONS.has(action)) {
-    return undefined;
-  }
-
-  return {
-    section,
-    action,
-    content,
-  };
-}
-
 export class Consolidator {
   private config: ConsolidationConfig;
   private logger: Logger;
-  private llmClient: LLMClient;
+  private llmService: LLMService;
 
-  constructor(config: ConsolidationConfig, logger: Logger, llmClient: LLMClient) {
+  constructor(config: ConsolidationConfig, logger: Logger, llmService: LLMService) {
     this.config = config;
     this.logger = logger;
-    this.llmClient = llmClient;
+    this.llmService = llmService;
   }
 
   async consolidate(): Promise<ConsolidationResult> {
@@ -247,11 +220,18 @@ export class Consolidator {
     currentFiles: Record<ConsolidatedFilename, string>
   ): Promise<ConsolidationProposal> {
     try {
-      const response = await this.llmClient.complete(
-        this.buildPrompt(currentFiles),
-        CONSOLIDATION_SYSTEM_PROMPT
-      );
-      return this.parseResponse(response);
+      const response = await this.llmService.generateObject<{
+        decision: "NO_WRITE" | "WRITE_CLEANUP";
+        proposed_updates: Partial<Record<ConsolidatedFilename, ConsolidationPatch[]>>;
+      }>({
+        systemPrompt: CONSOLIDATION_SYSTEM_PROMPT,
+        userPrompt: this.buildPrompt(currentFiles),
+        schema: CONSOLIDATION_RESPONSE_SCHEMA,
+      });
+      return {
+        decision: response.decision,
+        proposedUpdates: response.proposed_updates ?? {},
+      };
     } catch (error) {
       const reason = getErrorMessage(error);
       this.logger.error("Consolidator", "Consolidation LLM request failed", {
@@ -262,81 +242,6 @@ export class Consolidator {
         proposedUpdates: {},
       };
     }
-  }
-
-  private parseResponse(response: string): ConsolidationProposal {
-    const trimmedResponse = response.trim();
-    const codeFenceMatch = trimmedResponse.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    const candidateTexts: string[] = [];
-
-    if (trimmedResponse !== "") {
-      candidateTexts.push(trimmedResponse);
-    }
-
-    if (codeFenceMatch?.[1]) {
-      candidateTexts.push(codeFenceMatch[1].trim());
-    }
-
-    const firstJsonObject = extractFirstJSONObject(trimmedResponse);
-    if (firstJsonObject) {
-      candidateTexts.push(firstJsonObject.trim());
-    }
-
-    for (const candidate of Array.from(new Set(candidateTexts))) {
-      try {
-        const parsed = JSON.parse(candidate) as unknown;
-        const normalized = this.normalizeProposal(parsed);
-        if (normalized) {
-          return normalized;
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    this.logger.warn("Consolidator", "Failed to parse consolidation response", {
-      response: trimmedResponse,
-    });
-
-    return {
-      decision: "NO_WRITE",
-      proposedUpdates: {},
-    };
-  }
-
-  private normalizeProposal(parsed: unknown): ConsolidationProposal | undefined {
-    if (!isRecord(parsed)) {
-      return undefined;
-    }
-
-    const decision =
-      getNonEmptyString(parsed.decision) === "WRITE_CLEANUP"
-        ? "WRITE_CLEANUP"
-        : "NO_WRITE";
-    const proposedRaw = isRecord(parsed.proposed_updates)
-      ? parsed.proposed_updates
-      : isRecord(parsed.proposedUpdates)
-      ? parsed.proposedUpdates
-      : {};
-    const proposedUpdates: ConsolidationProposal["proposedUpdates"] = {};
-
-    for (const filename of MANAGED_FILES) {
-      const rawPatches = proposedRaw[filename];
-      const patches = Array.isArray(rawPatches)
-        ? rawPatches
-            .map((item: unknown) => normalizePatch(item))
-            .filter((item): item is ConsolidationPatch => item !== undefined)
-        : [];
-
-      if (patches.length > 0) {
-        proposedUpdates[filename] = patches;
-      }
-    }
-
-    return {
-      decision,
-      proposedUpdates,
-    };
   }
 
   private applyProposalToFiles(

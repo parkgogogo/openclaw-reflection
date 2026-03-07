@@ -20,7 +20,3 @@ export interface MemoryGateInput {
   currentUserMessage: string;
   currentAgentReply: string;
 }
-
-export interface LLMClient {
-  complete(prompt: string, systemPrompt: string): Promise<string>;
-}

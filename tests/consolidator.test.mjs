@@ -34,10 +34,10 @@ test("Consolidator uses cleanup decision and LLM proposed updates on long-term f
   );
 
   let calls = 0;
-  const llmClient = {
-    async complete() {
+  const llmService = {
+    async generateObject() {
       calls += 1;
-      return JSON.stringify({
+      return {
         decision: "WRITE_CLEANUP",
         proposed_updates: {
           "MEMORY.md": [
@@ -62,7 +62,7 @@ test("Consolidator uses cleanup decision and LLM proposed updates on long-term f
             },
           ],
         },
-      });
+      };
     },
   };
 
@@ -73,7 +73,7 @@ test("Consolidator uses cleanup decision and LLM proposed updates on long-term f
         schedule: "0 2 * * *",
       },
       createLogger(),
-      llmClient
+      llmService
     );
 
     const result = await consolidator.consolidate();

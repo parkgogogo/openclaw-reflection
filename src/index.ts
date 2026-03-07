@@ -3,10 +3,10 @@ import * as url from "url";
 import { parseConfig } from "./config.js";
 import { ConsolidationScheduler } from "./consolidation/index.js";
 import { FileCurator } from "./file-curator/index.js";
+import { LLMService as SharedLLMService } from "./llm/service.js";
 import { FileLogger } from "./logger.js";
 import {
   MemoryGateAnalyzer,
-  type LLMClient,
   type MemoryGateInput,
 } from "./memory-gate/index.js";
 import {
@@ -15,7 +15,13 @@ import {
   handleSessionEnd,
 } from "./message-handler.js";
 import { SessionBufferManager } from "./session-manager.js";
-import type { LogLevel, PluginConfig } from "./types.js";
+import type {
+  LLMCompleteParams,
+  LLMProvider,
+  LLMService,
+  LogLevel,
+  PluginConfig,
+} from "./types.js";
 
 type LoggerMethod = (message: string, ...args: unknown[]) => void;
 
@@ -31,6 +37,10 @@ export interface RuntimeCompletionAPI {
     model: string;
     prompt: string;
     systemPrompt: string;
+    responseFormat?: {
+      type: "json_schema";
+      jsonSchema: unknown;
+    };
   }) => Promise<unknown>;
 }
 
@@ -57,10 +67,6 @@ let gatewayLogger: PluginLogger | null = null;
 let fileLogger: FileLogger | null = null;
 let isRegistered = false;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -69,97 +75,64 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-function getCompletionText(result: unknown): string | null {
-  if (typeof result === "string") {
-    return result;
-  }
-
-  if (!isRecord(result)) {
-    return null;
-  }
-
-  if (typeof result.text === "string") {
-    return result.text;
-  }
-
-  if (typeof result.output_text === "string") {
-    return result.output_text;
-  }
-
-  return null;
-}
-
-function createLLMClient(
+function createLLMService(
   api: PluginAPI,
   model: string,
   logger: FileLogger
-): LLMClient {
+): LLMService {
   const runtimeComplete = api.runtime?.complete;
 
   if (typeof runtimeComplete === "function") {
-    return {
-      async complete(prompt: string, systemPrompt: string): Promise<string> {
+    const provider: LLMProvider = {
+      async complete(input: LLMCompleteParams): Promise<unknown> {
         try {
-          const response = await runtimeComplete({
+          return await runtimeComplete({
             model,
-            prompt,
-            systemPrompt,
+            prompt: input.prompt,
+            systemPrompt: input.systemPrompt,
+            responseFormat: input.responseFormat,
           });
-          const completionText = getCompletionText(response);
-
-          if (completionText === null) {
-            throw new Error("runtime.complete returned non-text response");
-          }
-
-          return completionText;
         } catch (error) {
           throw new Error(
             `runtime.complete call failed: ${getErrorMessage(error)}`
           );
         }
-      },
+      }
     };
+
+    return new SharedLLMService(provider);
   }
 
   logger.warn(
     "PluginLifecycle",
-    "No runtime completion API found, using mock LLM client",
+    "No runtime completion API found, using mock LLM service",
     { model }
   );
 
-  return {
-    async complete(
-      _prompt: string,
-      systemPrompt: string
-    ): Promise<string> {
-      if (systemPrompt.includes('"should_update"')) {
+  const provider: LLMProvider = {
+    async complete(input: LLMCompleteParams): Promise<string> {
+      if (input.systemPrompt.includes("Writer Guardian")) {
         return JSON.stringify({
-          should_update: false,
-          file: "MEMORY.md",
-          reason: "Mock LLM client in use (runtime.complete unavailable)",
+          action: "finish",
+          message: "Mock LLM service in use (runtime.complete unavailable)",
         });
       }
 
-      if (systemPrompt.includes('"WRITE_CLEANUP"')) {
+      if (input.systemPrompt.includes("WRITE_CLEANUP")) {
         return JSON.stringify({
           decision: "NO_WRITE",
           proposed_updates: {},
         });
       }
 
-      if (systemPrompt.includes('"UPDATE_MEMORY"')) {
-        return JSON.stringify({
-          decision: "NO_WRITE",
-          reason: "Mock LLM client in use (runtime.complete unavailable)",
-        });
-      }
-
       return JSON.stringify({
         decision: "NO_WRITE",
-        reason: "Mock LLM client in use (runtime.complete unavailable)",
+        reason: "Mock LLM service in use (runtime.complete unavailable)",
       });
     },
   };
+
+  return new SharedLLMService(provider);
 }
 
 function runHookSafely(
@@ -225,16 +198,16 @@ export default function activate(api: PluginAPI): void {
 
     const workspaceDir = process.cwd();
     const memoryModel = config.memoryGate.model;
-    const llmClient =
+    const llmService =
       config.memoryGate.enabled || config.consolidation.enabled
-        ? createLLMClient(api, memoryModel, logger)
+        ? createLLMService(api, memoryModel, logger)
         : undefined;
 
     let memoryGate: MemoryGateAnalyzer | undefined;
     let fileCurator: FileCurator | undefined;
 
-    if (config.memoryGate.enabled && llmClient) {
-      memoryGate = new MemoryGateAnalyzer(llmClient, logger);
+    if (config.memoryGate.enabled && llmService) {
+      memoryGate = new MemoryGateAnalyzer(llmService, logger);
       logger.info("PluginLifecycle", "MemoryGateAnalyzer initialized", {
         model: memoryModel,
       });
@@ -242,21 +215,21 @@ export default function activate(api: PluginAPI): void {
       logger.info("PluginLifecycle", "MemoryGateAnalyzer disabled");
     }
 
-    if (llmClient) {
-      fileCurator = new FileCurator({ workspaceDir }, logger, llmClient);
+    if (llmService) {
+      fileCurator = new FileCurator({ workspaceDir }, logger, llmService);
     }
     logger.info("PluginLifecycle", "FileCurator initialized", {
       workspaceDir,
     });
 
-    if (config.consolidation.enabled && llmClient) {
+    if (config.consolidation.enabled && llmService) {
       const consolidationScheduler = new ConsolidationScheduler(
         {
           workspaceDir,
           schedule: config.consolidation.schedule,
         },
         logger,
-        llmClient
+        llmService
       );
 
       consolidationScheduler.start();
@@ -382,6 +355,7 @@ export default function activate(api: PluginAPI): void {
 export { parseConfig } from "./config.js";
 export { FileLogger } from "./logger.js";
 export { SessionBufferManager } from "./session-manager.js";
+export { LLMService } from "./llm/service.js";
 export { FileCurator } from "./file-curator/index.js";
 export { MemoryGateAnalyzer, MEMORY_GATE_SYSTEM_PROMPT } from "./memory-gate/index.js";
 export { Consolidator, ConsolidationScheduler } from "./consolidation/index.js";
@@ -392,7 +366,7 @@ export {
 } from "./message-handler.js";
 export type {
   ConsolidationResult,
-  LLMClient,
+  LLMService as LLMServiceContract,
   MemoryGateInput,
   MemoryGateOutput,
   PluginConfig,

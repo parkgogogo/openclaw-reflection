@@ -82,7 +82,19 @@ export interface PluginConfig {
   consolidation: ConsolidationConfig;
 }
 
-export type { LLMClient, MemoryGateInput } from "./memory-gate/types.js";
+export type { MemoryGateInput } from "./memory-gate/types.js";
+export type {
+  AgentRunResult,
+  AgentStep,
+  AgentTool,
+  CompletionResponseFormat,
+  GenerateObjectParams,
+  JsonSchema,
+  LLMCompleteParams,
+  LLMProvider,
+  LLMService,
+  RunAgentParams,
+} from "./llm/types.js";
 export type {
   ConsolidatedFilename,
   ConsolidationPatch,
