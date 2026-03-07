@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "task_type",
+    "title",
+    "notes"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": ["memory_gate", "writer_guardian"]
+    },
+    "title": {
+      "type": "string"
+    },
+    "recent_messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "message"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["user", "agent"]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "current_user_message": {
+      "type": "string"
+    },
+    "current_agent_reply": {
+      "type": "string"
+    },
+    "gate_decision": {
+      "type": "string",
+      "enum": [
+        "UPDATE_MEMORY",
+        "UPDATE_USER",
+        "UPDATE_SOUL",
+        "UPDATE_IDENTITY"
+      ]
+    },
+    "gate_reason": {
+      "type": "string"
+    },
+    "candidate_fact": {
+      "type": "string"
+    },
+    "target_file": {
+      "type": "string",
+      "enum": ["MEMORY.md", "USER.md", "SOUL.md", "IDENTITY.md"]
+    },
+    "current_file_content": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

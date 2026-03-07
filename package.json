@@ -7,7 +7,10 @@
   "scripts": {
     "build": "tsc --noEmit",
     "clean": "rm -rf logs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval:memory-gate": "pnpm exec tsc && node evals/run.mjs --suite memory-gate",
+    "eval:writer-guardian": "pnpm exec tsc && node evals/run.mjs --suite writer-guardian",
+    "eval:all": "pnpm exec tsc && node evals/run.mjs --suite all"
   },
   "keywords": [
     "openclaw",

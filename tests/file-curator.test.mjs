@@ -81,6 +81,46 @@ test("FileCurator exposes read and write tools to the writer guardian", async ()
       /Writer Guardian/,
       "expected writer guardian system prompt"
     );
+    assert.doesNotMatch(
+      receivedRunAgent.systemPrompt,
+      /\bLia\b/,
+      "writer guardian prompt should not hardcode a specific assistant name"
+    );
+    assert.doesNotMatch(
+      receivedRunAgent.systemPrompt,
+      /ongoing projects|active threads/i,
+      "MEMORY prompt should not treat project chatter as durable memory by default"
+    );
+    assert.doesNotMatch(
+      receivedRunAgent.systemPrompt,
+      /recurring goals, projects/i,
+      "USER prompt should not treat project topics as user profile by default"
+    );
+    assert.match(
+      receivedRunAgent.systemPrompt,
+      /project chatter.*USER\.md/i,
+      "writer guardian prompt should explicitly reject project chatter in USER.md"
+    );
+    assert.match(
+      receivedRunAgent.systemPrompt,
+      /continuity/i,
+      "writer guardian prompt should treat continuity rules as valid SOUL content"
+    );
+    assert.match(
+      receivedRunAgent.systemPrompt,
+      /explicit metadata change.*write/i,
+      "writer guardian prompt should allow explicit IDENTITY metadata changes"
+    );
+    assert.match(
+      receivedRunAgent.systemPrompt,
+      /replace existing metadata/i,
+      "writer guardian prompt should allow replacing old identity metadata"
+    );
+    assert.match(
+      receivedRunAgent.systemPrompt,
+      /preserve the candidate fact/i,
+      "writer guardian prompt should preserve candidate fact wording when writing"
+    );
     assert.equal(
       content,
       "# USER\n\n## Preferences\n- existing preference\n- prefer direct technical feedback\n",

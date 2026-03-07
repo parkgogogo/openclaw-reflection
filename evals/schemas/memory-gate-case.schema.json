@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "expected_decision",
+    "severity",
+    "tags"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "expected_decision": {
+      "type": "string",
+      "enum": [
+        "NO_WRITE",
+        "UPDATE_MEMORY",
+        "UPDATE_USER",
+        "UPDATE_SOUL",
+        "UPDATE_IDENTITY"
+      ]
+    },
+    "expected_candidate_fact": {
+      "type": "string"
+    },
+    "allowed_candidate_fact_variants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["core", "boundary"]
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
