@@ -7,7 +7,6 @@ import { LLMService as SharedLLMService } from "./llm/service.js";
 import { FileLogger } from "./logger.js";
 import {
   MemoryGateAnalyzer,
-  type MemoryGateInput,
 } from "./memory-gate/index.js";
 import {
   handleMessageReceived,
@@ -16,10 +15,7 @@ import {
 } from "./message-handler.js";
 import { SessionBufferManager } from "./session-manager.js";
 import type {
-  LLMCompleteParams,
-  LLMProvider,
   LLMService,
-  LogLevel,
   PluginConfig,
 } from "./types.js";
 
@@ -32,24 +28,11 @@ export interface PluginLogger {
   error: LoggerMethod;
 }
 
-export interface RuntimeCompletionAPI {
-  complete?: (input: {
-    model: string;
-    prompt: string;
-    systemPrompt: string;
-    responseFormat?: {
-      type: "json_schema";
-      jsonSchema: unknown;
-    };
-  }) => Promise<unknown>;
-}
-
 export interface PluginAPI {
   config?: {
     get?: (key: string) => unknown;
   };
   logger: PluginLogger;
-  runtime?: RuntimeCompletionAPI;
   registerHook: (
     event: string,
     handler: (event: unknown, context?: unknown) => void,
@@ -75,64 +58,18 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-function createLLMService(
-  api: PluginAPI,
-  model: string,
-  logger: FileLogger
-): LLMService {
-  const runtimeComplete = api.runtime?.complete;
+function createLLMService(config: PluginConfig): LLMService {
+  const { baseURL, apiKey, model } = config.llm;
 
-  if (typeof runtimeComplete === "function") {
-    const provider: LLMProvider = {
-      async complete(input: LLMCompleteParams): Promise<unknown> {
-        try {
-          return await runtimeComplete({
-            model,
-            prompt: input.prompt,
-            systemPrompt: input.systemPrompt,
-            responseFormat: input.responseFormat,
-          });
-        } catch (error) {
-          throw new Error(
-            `runtime.complete call failed: ${getErrorMessage(error)}`
-          );
-        }
-      }
-    };
-
-    return new SharedLLMService(provider);
+  if (baseURL.trim() === "" || apiKey.trim() === "" || model.trim() === "") {
+    throw new Error("LLM config requires non-empty llm.baseURL, llm.apiKey, and llm.model");
   }
 
-  logger.warn(
-    "PluginLifecycle",
-    "No runtime completion API found, using mock LLM service",
-    { model }
-  );
-
-  const provider: LLMProvider = {
-    async complete(input: LLMCompleteParams): Promise<string> {
-      if (input.systemPrompt.includes("Writer Guardian")) {
-        return JSON.stringify({
-          action: "finish",
-          message: "Mock LLM service in use (runtime.complete unavailable)",
-        });
-      }
-
-      if (input.systemPrompt.includes("WRITE_CLEANUP")) {
-        return JSON.stringify({
-          decision: "NO_WRITE",
-          proposed_updates: {},
-        });
-      }
-
-      return JSON.stringify({
-        decision: "NO_WRITE",
-        reason: "Mock LLM service in use (runtime.complete unavailable)",
-      });
-    },
-  };
-
-  return new SharedLLMService(provider);
+  return new SharedLLMService({
+    baseURL,
+    apiKey,
+    model,
+  });
 }
 
 function runHookSafely(
@@ -197,10 +134,9 @@ export default function activate(api: PluginAPI): void {
     });
 
     const workspaceDir = process.cwd();
-    const memoryModel = config.memoryGate.model;
     const llmService =
       config.memoryGate.enabled || config.consolidation.enabled
-        ? createLLMService(api, memoryModel, logger)
+        ? createLLMService(config)
         : undefined;
 
     let memoryGate: MemoryGateAnalyzer | undefined;
@@ -209,7 +145,7 @@ export default function activate(api: PluginAPI): void {
     if (config.memoryGate.enabled && llmService) {
       memoryGate = new MemoryGateAnalyzer(llmService, logger);
       logger.info("PluginLifecycle", "MemoryGateAnalyzer initialized", {
-        model: memoryModel,
+        model: config.llm.model,
       });
     } else {
       logger.info("PluginLifecycle", "MemoryGateAnalyzer disabled");

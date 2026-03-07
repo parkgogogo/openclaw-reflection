@@ -4,9 +4,10 @@ import type {
   AgentTool,
   GenerateObjectParams,
   JsonSchema,
-  LLMCompleteParams,
-  LLMProvider,
   LLMService as LLMServiceContract,
+  LLMServiceConfig,
+  LLMServiceOptions,
+  FetchLike,
   RunAgentParams,
 } from "./types.js";
 
@@ -23,106 +24,16 @@ interface AgentActionFinish {
 
 type AgentAction = AgentActionTool | AgentActionFinish;
 
+interface ChatCompletionResponse {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+    };
+  }>;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function getCompletionText(result: unknown): string | null {
-  if (typeof result === "string") {
-    return result;
-  }
-
-  if (!isRecord(result)) {
-    return null;
-  }
-
-  if (typeof result.text === "string") {
-    return result.text;
-  }
-
-  if (typeof result.output_text === "string") {
-    return result.output_text;
-  }
-
-  return null;
-}
-
-function extractFirstJSONObject(rawText: string): string | null {
-  let startIndex = -1;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let index = 0; index < rawText.length; index += 1) {
-    const char = rawText[index];
-
-    if (startIndex === -1) {
-      if (char === "{") {
-        startIndex = index;
-        depth = 1;
-      }
-      continue;
-    }
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (char === "{") {
-      depth += 1;
-      continue;
-    }
-
-    if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return rawText.slice(startIndex, index + 1);
-      }
-    }
-  }
-
-  return null;
-}
-
-function parseJsonLikeText(text: string): unknown {
-  const trimmed = text.trim();
-  if (trimmed === "") {
-    throw new Error("LLM returned empty response");
-  }
-
-  const codeFenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidates = [trimmed];
-
-  if (codeFenceMatch?.[1]) {
-    candidates.push(codeFenceMatch[1].trim());
-  }
-
-  const firstObject = extractFirstJSONObject(trimmed);
-  if (firstObject) {
-    candidates.push(firstObject.trim());
-  }
-
-  for (const candidate of Array.from(new Set(candidates))) {
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      continue;
-    }
-  }
-
-  throw new Error("Failed to parse LLM response as JSON");
 }
 
 function validateAgainstSchema(
@@ -189,13 +100,35 @@ function validateAgainstSchema(
   }
 }
 
-function buildStructuredPrompt(prompt: string, schema: JsonSchema): string {
-  return [
-    prompt,
-    "",
-    "Respond with JSON only.",
-    `Schema: ${JSON.stringify(schema)}`,
-  ].join("\n");
+function normalizeBaseURL(baseURL: string): string {
+  return baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL;
+}
+
+function extractMessageContent(response: unknown): string {
+  if (!isRecord(response)) {
+    throw new Error("Provider returned non-object response");
+  }
+
+  const parsed = response as ChatCompletionResponse;
+  const content = parsed.choices?.[0]?.message?.content;
+
+  if (typeof content !== "string" || content.trim() === "") {
+    throw new Error("Provider returned empty message content");
+  }
+
+  return content;
+}
+
+function parseStrictJSONObject(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(
+      `Provider returned invalid JSON content: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
 }
 
 function buildAgentLoopPrompt(
@@ -258,7 +191,7 @@ function normalizeAgentAction(value: unknown): AgentAction {
     return {
       action: "tool",
       tool_name: value.tool_name,
-      tool_input: value.tool_input ?? value.toolInput ?? {},
+      tool_input: value.tool_input ?? {},
     };
   }
 
@@ -266,22 +199,28 @@ function normalizeAgentAction(value: unknown): AgentAction {
 }
 
 export class LLMService implements LLMServiceContract {
-  private provider: LLMProvider;
+  private config: LLMServiceConfig;
+  private fetchImpl: FetchLike;
 
-  constructor(provider: LLMProvider) {
-    this.provider = provider;
+  constructor(config: LLMServiceConfig, options: LLMServiceOptions = {}) {
+    this.config = config;
+    const globalFetch = (globalThis as { fetch?: FetchLike }).fetch;
+    const resolvedFetch = options.fetch ?? globalFetch;
+
+    if (typeof resolvedFetch !== "function") {
+      throw new Error("Global fetch is unavailable");
+    }
+
+    this.fetchImpl = resolvedFetch;
   }
 
   async generateObject<T>(params: GenerateObjectParams<T>): Promise<T> {
-    const raw = await this.requestText({
-      prompt: buildStructuredPrompt(params.userPrompt, params.schema),
+    const parsed = await this.requestJSON({
       systemPrompt: params.systemPrompt,
-      responseFormat: {
-        type: "json_schema",
-        jsonSchema: params.schema,
-      },
+      userPrompt: params.userPrompt,
+      schema: params.schema,
+      schemaName: "structured_output",
     });
-    const parsed = parseJsonLikeText(raw);
     const errors = validateAgainstSchema(parsed, params.schema);
 
     if (errors.length > 0) {
@@ -297,33 +236,30 @@ export class LLMService implements LLMServiceContract {
     const tools = new Map(params.tools.map((tool) => [tool.name, tool]));
 
     for (let stepIndex = 0; stepIndex < params.maxSteps; stepIndex += 1) {
-      const raw = await this.requestText({
-        prompt: buildAgentLoopPrompt(params.userPrompt, params.tools, steps),
+      const parsed = await this.requestJSON({
         systemPrompt: params.systemPrompt,
-        responseFormat: {
-          type: "json_schema",
-          jsonSchema: {
-            type: "object",
-            additionalProperties: false,
-            required: ["action"],
-            properties: {
-              action: {
-                type: "string",
-                enum: ["tool", "finish"],
-              },
-              tool_name: { type: "string" },
-              tool_input: {
-                type: "object",
-                properties: {},
-                additionalProperties: true,
-              },
-              message: { type: "string" },
+        userPrompt: buildAgentLoopPrompt(params.userPrompt, params.tools, steps),
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["action"],
+          properties: {
+            action: {
+              type: "string",
+              enum: ["tool", "finish"],
             },
+            tool_name: { type: "string" },
+            tool_input: {
+              type: "object",
+              properties: {},
+              additionalProperties: true,
+            },
+            message: { type: "string" },
           },
         },
+        schemaName: "agent_step",
       });
 
-      const parsed = parseJsonLikeText(raw);
       const action = normalizeAgentAction(parsed);
       steps.push({ type: "assistant", response: action });
 
@@ -367,14 +303,53 @@ export class LLMService implements LLMServiceContract {
     };
   }
 
-  private async requestText(input: LLMCompleteParams): Promise<string> {
-    const response = await this.provider.complete(input);
-    const text = getCompletionText(response);
+  private async requestJSON(params: {
+    systemPrompt: string;
+    userPrompt: string;
+    schema: JsonSchema;
+    schemaName: string;
+  }): Promise<unknown> {
+    const response = await this.fetchImpl(
+      `${normalizeBaseURL(this.config.baseURL)}/chat/completions`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${this.config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            {
+              role: "system",
+              content: params.systemPrompt,
+            },
+            {
+              role: "user",
+              content: params.userPrompt,
+            },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: params.schemaName,
+              strict: true,
+              schema: params.schema,
+            },
+          },
+        }),
+      }
+    );
 
-    if (text === null) {
-      throw new Error("LLM provider returned non-text response");
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Provider request failed with status ${response.status}: ${errorText}`
+      );
     }
 
-    return text;
+    const payload = (await response.json()) as unknown;
+    const content = extractMessageContent(payload);
+    return parseStrictJSONObject(content);
   }
 }

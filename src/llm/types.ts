@@ -55,19 +55,30 @@ export interface AgentRunResult {
   finalMessage?: string;
 }
 
-export interface CompletionResponseFormat {
-  type: "json_schema";
-  jsonSchema: JsonSchema;
+export interface LLMServiceConfig {
+  baseURL: string;
+  apiKey: string;
+  model: string;
 }
 
-export interface LLMCompleteParams {
-  prompt: string;
-  systemPrompt: string;
-  responseFormat?: CompletionResponseFormat;
+export interface FetchLikeResponse {
+  ok: boolean;
+  status: number;
+  json(): Promise<unknown>;
+  text(): Promise<string>;
 }
 
-export interface LLMProvider {
-  complete(input: LLMCompleteParams): Promise<unknown>;
+export type FetchLike = (
+  input: string,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  }
+) => Promise<FetchLikeResponse>;
+
+export interface LLMServiceOptions {
+  fetch?: FetchLike;
 }
 
 export interface LLMService {

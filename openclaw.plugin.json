@@ -14,6 +14,23 @@
         "enum": ["debug", "info", "warn", "error"],
         "default": "info"
       },
+      "llm": {
+        "type": "object",
+        "properties": {
+          "baseURL": {
+            "type": "string",
+            "default": "https://api.openai.com/v1"
+          },
+          "apiKey": {
+            "type": "string",
+            "default": ""
+          },
+          "model": {
+            "type": "string",
+            "default": "gpt-4.1-mini"
+          }
+        }
+      },
       "memoryGate": {
         "type": "object",
         "properties": {
@@ -25,10 +42,6 @@
             "type": "integer",
             "minimum": 1,
             "default": 10
-          },
-          "model": {
-            "type": "string",
-            "default": "kimi-coding/k2p5"
           }
         }
       },

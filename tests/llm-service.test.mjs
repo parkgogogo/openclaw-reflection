@@ -3,18 +3,46 @@ import assert from "node:assert/strict";
 
 import { LLMService } from "../dist/llm/service.js";
 
-test("LLMService generateObject returns validated object output", async () => {
-  const calls = [];
-  const service = new LLMService({
-    async complete(input) {
-      calls.push(input);
-      return JSON.stringify({
-        decision: "UPDATE_USER",
-        reason: "stable preference",
-        candidate_fact: "prefers direct feedback",
-      });
+function createJSONResponse(payload, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    async json() {
+      return payload;
     },
-  });
+    async text() {
+      return JSON.stringify(payload);
+    },
+  };
+}
+
+test("LLMService generateObject sends structured output request to OpenAI-compatible provider", async () => {
+  const calls = [];
+  const service = new LLMService(
+    {
+      baseURL: "https://example.com/v1",
+      apiKey: "test-key",
+      model: "gpt-test",
+    },
+    {
+      async fetch(url, init) {
+        calls.push({ url, init });
+        return createJSONResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  decision: "UPDATE_USER",
+                  reason: "stable preference",
+                  candidate_fact: "prefers direct feedback",
+                }),
+              },
+            },
+          ],
+        });
+      },
+    }
+  );
 
   const schema = {
     type: "object",
@@ -48,18 +76,39 @@ test("LLMService generateObject returns validated object output", async () => {
     candidate_fact: "prefers direct feedback",
   });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].responseFormat?.type, "json_schema");
+  assert.equal(calls[0].url, "https://example.com/v1/chat/completions");
+  assert.equal(calls[0].init.headers.authorization, "Bearer test-key");
+
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.model, "gpt-test");
+  assert.equal(body.response_format.type, "json_schema");
+  assert.equal(body.response_format.json_schema.strict, true);
 });
 
 test("LLMService generateObject rejects invalid schema output", async () => {
-  const service = new LLMService({
-    async complete() {
-      return JSON.stringify({
-        decision: "NOT_A_REAL_DECISION",
-        reason: "bad output",
-      });
+  const service = new LLMService(
+    {
+      baseURL: "https://example.com/v1",
+      apiKey: "test-key",
+      model: "gpt-test",
     },
-  });
+    {
+      async fetch() {
+        return createJSONResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  decision: "NOT_A_REAL_DECISION",
+                  reason: "bad output",
+                }),
+              },
+            },
+          ],
+        });
+      },
+    }
+  );
 
   await assert.rejects(
     service.generateObject({
@@ -84,35 +133,66 @@ test("LLMService generateObject rejects invalid schema output", async () => {
 
 test("LLMService runAgent executes read then write tools", async () => {
   const responses = [
-    JSON.stringify({
-      action: "tool",
-      tool_name: "read",
-      tool_input: {},
-    }),
-    JSON.stringify({
-      action: "tool",
-      tool_name: "write",
-      tool_input: {
-        content: "# USER\n\n## Preferences\n- prefers direct feedback\n",
-      },
-    }),
-    JSON.stringify({
-      action: "finish",
-      message: "updated",
-    }),
+    {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              action: "tool",
+              tool_name: "read",
+              tool_input: {},
+            }),
+          },
+        },
+      ],
+    },
+    {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              action: "tool",
+              tool_name: "write",
+              tool_input: {
+                content: "# USER\n\n## Preferences\n- prefers direct feedback\n",
+              },
+            }),
+          },
+        },
+      ],
+    },
+    {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              action: "finish",
+              message: "updated",
+            }),
+          },
+        },
+      ],
+    },
   ];
 
   let readCalls = 0;
   const writes = [];
-  const service = new LLMService({
-    async complete() {
-      const next = responses.shift();
-      if (!next) {
-        throw new Error("No more mock responses");
-      }
-      return next;
+  const service = new LLMService(
+    {
+      baseURL: "https://example.com/v1",
+      apiKey: "test-key",
+      model: "gpt-test",
     },
-  });
+    {
+      async fetch() {
+        const next = responses.shift();
+        if (!next) {
+          throw new Error("No more mock responses");
+        }
+        return createJSONResponse(next);
+      },
+    }
+  );
 
   const result = await service.runAgent({
     systemPrompt: "You are a writer guardian",
@@ -156,22 +236,33 @@ test("LLMService runAgent executes read then write tools", async () => {
     { content: "# USER\n\n## Preferences\n- prefers direct feedback\n" },
   ]);
   assert.equal(result.didWrite, true);
-  assert.equal(
-    result.steps.filter((step) => step.type === "tool").length,
-    2,
-    "expected agent loop to record both tool calls"
-  );
+  assert.equal(result.steps.filter((step) => step.type === "tool").length, 2);
 });
 
 test("LLMService runAgent returns didWrite=false when no write tool is called", async () => {
-  const service = new LLMService({
-    async complete() {
-      return JSON.stringify({
-        action: "finish",
-        message: "refuse write",
-      });
+  const service = new LLMService(
+    {
+      baseURL: "https://example.com/v1",
+      apiKey: "test-key",
+      model: "gpt-test",
     },
-  });
+    {
+      async fetch() {
+        return createJSONResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  action: "finish",
+                  message: "refuse write",
+                }),
+              },
+            },
+          ],
+        });
+      },
+    }
+  );
 
   const result = await service.runAgent({
     systemPrompt: "You are a writer guardian",
@@ -209,9 +300,5 @@ test("LLMService runAgent returns didWrite=false when no write tool is called", 
   });
 
   assert.equal(result.didWrite, false);
-  assert.equal(
-    result.steps.filter((step) => step.type === "tool").length,
-    0,
-    "expected no tool calls when the agent immediately finishes"
-  );
+  assert.equal(result.steps.filter((step) => step.type === "tool").length, 0);
 });

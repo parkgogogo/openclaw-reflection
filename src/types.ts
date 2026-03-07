@@ -67,7 +67,6 @@ export interface MemoryGateOutput {
 export interface MemoryGateConfig {
   enabled: boolean;
   windowSize: number;
-  model: string;
 }
 
 export interface ConsolidationConfig {
@@ -75,9 +74,16 @@ export interface ConsolidationConfig {
   schedule: string;
 }
 
+export interface LLMConfig {
+  baseURL: string;
+  apiKey: string;
+  model: string;
+}
+
 export interface PluginConfig {
   bufferSize: number;
   logLevel: LogLevel;
+  llm: LLMConfig;
   memoryGate: MemoryGateConfig;
   consolidation: ConsolidationConfig;
 }
@@ -87,12 +93,11 @@ export type {
   AgentRunResult,
   AgentStep,
   AgentTool,
-  CompletionResponseFormat,
   GenerateObjectParams,
   JsonSchema,
-  LLMCompleteParams,
-  LLMProvider,
   LLMService,
+  LLMServiceConfig,
+  LLMServiceOptions,
   RunAgentParams,
 } from "./llm/types.js";
 export type {

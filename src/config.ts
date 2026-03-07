@@ -9,10 +9,14 @@ interface PluginAPI {
 const DEFAULT_CONFIG: PluginConfig = {
   bufferSize: 50,
   logLevel: "info",
+  llm: {
+    baseURL: "https://api.openai.com/v1",
+    apiKey: "",
+    model: "gpt-4.1-mini",
+  },
   memoryGate: {
     enabled: true,
     windowSize: 10,
-    model: "kimi-coding/k2p5",
   },
   consolidation: {
     enabled: true,
@@ -60,9 +64,11 @@ function getLogLevel(value: unknown): LogLevel {
 
 export function parseConfig(api: PluginAPI): PluginConfig {
   const config = api.config ?? {};
+  const llmRaw = config.get?.("llm");
   const memoryGateRaw = config.get?.("memoryGate");
   const consolidationRaw = config.get?.("consolidation");
 
+  const llmConfig = isRecord(llmRaw) ? llmRaw : {};
   const memoryGateConfig = isRecord(memoryGateRaw) ? memoryGateRaw : {};
   const consolidationConfig = isRecord(consolidationRaw) ? consolidationRaw : {};
 
@@ -72,6 +78,11 @@ export function parseConfig(api: PluginAPI): PluginConfig {
       DEFAULT_CONFIG.bufferSize
     ),
     logLevel: getLogLevel(config.get?.("logLevel")),
+    llm: {
+      baseURL: getString(llmConfig.baseURL, DEFAULT_CONFIG.llm.baseURL),
+      apiKey: getString(llmConfig.apiKey, DEFAULT_CONFIG.llm.apiKey),
+      model: getString(llmConfig.model, DEFAULT_CONFIG.llm.model),
+    },
     memoryGate: {
       enabled: getBoolean(
         memoryGateConfig.enabled,
@@ -81,7 +92,6 @@ export function parseConfig(api: PluginAPI): PluginConfig {
         memoryGateConfig.windowSize,
         DEFAULT_CONFIG.memoryGate.windowSize
       ),
-      model: getString(memoryGateConfig.model, DEFAULT_CONFIG.memoryGate.model),
     },
     consolidation: {
       enabled: getBoolean(

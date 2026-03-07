@@ -3,10 +3,9 @@ export type {
   AgentRunResult,
   AgentStep,
   AgentTool,
-  CompletionResponseFormat,
   GenerateObjectParams,
   JsonSchema,
-  LLMCompleteParams,
-  LLMProvider,
+  LLMServiceConfig,
+  LLMServiceOptions,
   RunAgentParams,
 } from "./types.js";
