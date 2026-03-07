@@ -137,26 +137,17 @@ test("LLMService runAgent executes read then write tools", async () => {
       choices: [
         {
           message: {
-            content: JSON.stringify({
-              action: "tool",
-              tool_name: "read",
-              tool_input: {},
-            }),
-          },
-        },
-      ],
-    },
-    {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              action: "tool",
-              tool_name: "write",
-              tool_input: {
-                content: "# USER\n\n## Preferences\n- prefers direct feedback\n",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_read",
+                type: "function",
+                function: {
+                  name: "read",
+                  arguments: "{}",
+                },
               },
-            }),
+            ],
           },
         },
       ],
@@ -165,10 +156,28 @@ test("LLMService runAgent executes read then write tools", async () => {
       choices: [
         {
           message: {
-            content: JSON.stringify({
-              action: "finish",
-              message: "updated",
-            }),
+            content: null,
+            tool_calls: [
+              {
+                id: "call_write",
+                type: "function",
+                function: {
+                  name: "write",
+                  arguments: JSON.stringify({
+                    content: "# USER\n\n## Preferences\n- prefers direct feedback\n",
+                  }),
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      choices: [
+        {
+          message: {
+            content: "updated",
           },
         },
       ],
@@ -177,6 +186,7 @@ test("LLMService runAgent executes read then write tools", async () => {
 
   let readCalls = 0;
   const writes = [];
+  const calls = [];
   const service = new LLMService(
     {
       baseURL: "https://example.com/v1",
@@ -184,7 +194,8 @@ test("LLMService runAgent executes read then write tools", async () => {
       model: "gpt-test",
     },
     {
-      async fetch() {
+      async fetch(url, init) {
+        calls.push({ url, init });
         const next = responses.shift();
         if (!next) {
           throw new Error("No more mock responses");
@@ -235,8 +246,68 @@ test("LLMService runAgent executes read then write tools", async () => {
   assert.deepEqual(writes, [
     { content: "# USER\n\n## Preferences\n- prefers direct feedback\n" },
   ]);
+  assert.equal(calls.length, 3);
+
+  const firstBody = JSON.parse(calls[0].init.body);
+  assert.equal(firstBody.tool_choice, "auto");
+  assert.equal(Array.isArray(firstBody.tools), true);
+  assert.equal(firstBody.tools[0].type, "function");
+  assert.equal(firstBody.tools[0].function.name, "read");
+  assert.equal(firstBody.tools[1].function.name, "write");
+  assert.equal(firstBody.response_format, undefined);
+
   assert.equal(result.didWrite, true);
   assert.equal(result.steps.filter((step) => step.type === "tool").length, 2);
+});
+
+test("LLMService runAgent rejects legacy function_call payload", async () => {
+  const service = new LLMService(
+    {
+      baseURL: "https://example.com/v1",
+      apiKey: "test-key",
+      model: "gpt-test",
+    },
+    {
+      async fetch() {
+        return createJSONResponse({
+          choices: [
+            {
+              message: {
+                content: null,
+                function_call: {
+                  name: "read",
+                  arguments: "{}",
+                },
+              },
+            },
+          ],
+        });
+      },
+    }
+  );
+
+  await assert.rejects(
+    service.runAgent({
+      systemPrompt: "You are a writer guardian",
+      userPrompt: "Read USER.md",
+      maxSteps: 3,
+      tools: [
+        {
+          name: "read",
+          description: "Read current target file content",
+          inputSchema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {},
+          },
+          async execute() {
+            throw new Error("read should not be called");
+          },
+        },
+      ],
+    }),
+    /legacy function_call payload/
+  );
 });
 
 test("LLMService runAgent returns didWrite=false when no write tool is called", async () => {
@@ -252,10 +323,7 @@ test("LLMService runAgent returns didWrite=false when no write tool is called", 
           choices: [
             {
               message: {
-                content: JSON.stringify({
-                  action: "finish",
-                  message: "refuse write",
-                }),
+                content: "refuse write",
               },
             },
           ],
@@ -300,5 +368,6 @@ test("LLMService runAgent returns didWrite=false when no write tool is called", 
   });
 
   assert.equal(result.didWrite, false);
+  assert.equal(result.finalMessage, "refuse write");
   assert.equal(result.steps.filter((step) => step.type === "tool").length, 0);
 });
