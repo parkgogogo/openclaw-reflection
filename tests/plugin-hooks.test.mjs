@@ -36,8 +36,8 @@ test('activate registers message hooks through registerHook when api.on is unava
 
   const events = registered.map((entry) => entry.event);
   assert.deepEqual(events, [
-    'message_received',
-    'message_sent',
+    'message:received',
+    'message:sent',
     'command:new',
     'command:reset',
   ]);

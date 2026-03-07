@@ -97,7 +97,10 @@ function registerMessageHook(
     return;
   }
 
-  api.registerHook(hookName, handler, {
+  const fallbackHookName =
+    hookName === "message_received" ? "message:received" : "message:sent";
+
+  api.registerHook(fallbackHookName, handler, {
     name: `reflection-${hookName}`,
   });
 }
