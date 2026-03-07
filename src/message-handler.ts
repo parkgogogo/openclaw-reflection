@@ -285,15 +285,47 @@ async function triggerMemoryGate(
 
     if (isUpdateDecision(output.decision)) {
       if (fileCurator) {
-        await fileCurator.write(output);
-        logger.info(
-          "MessageHandler",
-          "File curator triggered by memory gate",
-          {
-            decision: output.decision,
-          },
-          sessionKey
-        );
+        const writeResult = await fileCurator.write(output);
+        if (writeResult.status === "written") {
+          logger.info(
+            "MessageHandler",
+            "Writer guardian applied update",
+            {
+              decision: output.decision,
+            },
+            sessionKey
+          );
+        } else if (writeResult.status === "refused") {
+          logger.info(
+            "MessageHandler",
+            "Writer guardian refused update",
+            {
+              decision: output.decision,
+              reason: writeResult.reason,
+            },
+            sessionKey
+          );
+        } else if (writeResult.status === "failed") {
+          logger.error(
+            "MessageHandler",
+            "Writer guardian failed",
+            {
+              decision: output.decision,
+              reason: writeResult.reason,
+            },
+            sessionKey
+          );
+        } else {
+          logger.warn(
+            "MessageHandler",
+            "Writer guardian skipped update",
+            {
+              decision: output.decision,
+              reason: writeResult.reason,
+            },
+            sessionKey
+          );
+        }
       } else {
         logger.warn(
           "MessageHandler",
@@ -415,16 +447,36 @@ export function handleMessageSent(
     sessionKey
   );
 
+  const messageId = message.metadata?.messageId;
+  if (messageId && bufferManager.hasProcessedAgentMessage(sessionKey, messageId)) {
+    logger.info(
+      "MessageHandler",
+      "Skipped duplicate agent message event",
+      {
+        hookName: "message:sent",
+        messageId,
+      },
+      sessionKey
+    );
+    return;
+  }
+
   bufferManager.push(sessionKey, message);
 
-  if (memoryGate && fileCurator) {
-    void triggerMemoryGate(
-      sessionKey,
-      bufferManager,
-      memoryGate,
-      fileCurator,
-      logger,
-      memoryGateWindowSize
+  if (memoryGate) {
+    if (messageId) {
+      bufferManager.markProcessedAgentMessage(sessionKey, messageId);
+    }
+
+    void bufferManager.runExclusive(sessionKey, () =>
+      triggerMemoryGate(
+        sessionKey,
+        bufferManager,
+        memoryGate,
+        fileCurator,
+        logger,
+        memoryGateWindowSize
+      )
     );
   }
 }

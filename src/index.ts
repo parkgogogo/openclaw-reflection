@@ -87,6 +87,21 @@ function runHookSafely(
   }
 }
 
+function registerMessageHook(
+  api: PluginAPI,
+  hookName: "message_received" | "message_sent",
+  handler: (event: unknown, context?: unknown) => void
+): void {
+  if (typeof api.on === "function") {
+    api.on(hookName, handler);
+    return;
+  }
+
+  api.registerHook(hookName, handler, {
+    name: `reflection-${hookName}`,
+  });
+}
+
 export default function activate(api: PluginAPI): void {
   if (isRegistered) {
     gatewayLogger?.warn(
@@ -181,8 +196,10 @@ export default function activate(api: PluginAPI): void {
       logger.info("PluginLifecycle", "ConsolidationScheduler disabled");
     }
 
-    if (typeof api.on === "function") {
-      api.on("message_received", (event: unknown, context?: unknown) => {
+    registerMessageHook(
+      api,
+      "message_received",
+      (event: unknown, context?: unknown) => {
         runHookSafely(logger, "message_received", () => {
           logger.debug("PluginLifecycle", "Callback invoked", {
             hook: "message_received",
@@ -192,7 +209,7 @@ export default function activate(api: PluginAPI): void {
 
           if (bufferManager) {
             handleMessageReceived(event, bufferManager, logger, context);
-            logger.debug("PluginLifecycle", "Callback completed", {
+            logger.debug("PluginLifecycle", "Callback dispatched", {
               hook: "message_received",
             });
           } else {
@@ -201,9 +218,13 @@ export default function activate(api: PluginAPI): void {
             });
           }
         });
-      });
+      }
+    );
 
-      api.on("message_sent", (event: unknown, context?: unknown) => {
+    registerMessageHook(
+      api,
+      "message_sent",
+      (event: unknown, context?: unknown) => {
         runHookSafely(logger, "message_sent", () => {
           logger.debug("PluginLifecycle", "Callback invoked", {
             hook: "message_sent",
@@ -221,7 +242,7 @@ export default function activate(api: PluginAPI): void {
               fileCurator,
               config.memoryGate.windowSize
             );
-            logger.debug("PluginLifecycle", "Callback completed", {
+            logger.debug("PluginLifecycle", "Callback dispatched", {
               hook: "message_sent",
             });
           } else {
@@ -230,11 +251,11 @@ export default function activate(api: PluginAPI): void {
             });
           }
         });
-      });
+      }
+    );
 
-      gatewayLogger.info("[Reflection] Typed message hooks registered");
-      logger.info("PluginLifecycle", "Typed message hooks registered");
-    }
+    gatewayLogger.info("[Reflection] Message hooks registered");
+    logger.info("PluginLifecycle", "Message hooks registered");
 
     api.registerHook(
       "command:new",

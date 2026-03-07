@@ -185,3 +185,30 @@ test("FileCurator logs guardian refusal and leaves the target file untouched", a
     await rm(workspaceDir, { recursive: true, force: true });
   }
 });
+
+test("FileCurator returns failed status when writer guardian execution fails", async () => {
+  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "reflection-curator-"));
+  const logger = createLogger();
+
+  const llmService = {
+    async runAgent() {
+      throw new Error("provider timeout");
+    },
+  };
+
+  try {
+    const curator = new FileCurator({ workspaceDir }, logger, llmService);
+    const result = await curator.write({
+      decision: "UPDATE_USER",
+      reason: "stable preference",
+      candidateFact: "prefers direct technical feedback",
+    });
+
+    assert.deepEqual(result, {
+      status: "failed",
+      reason: "provider timeout",
+    });
+  } finally {
+    await rm(workspaceDir, { recursive: true, force: true });
+  }
+});

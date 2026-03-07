@@ -14,6 +14,11 @@ interface FileCuratorConfig {
   workspaceDir: string;
 }
 
+export interface FileCuratorWriteResult {
+  status: "written" | "refused" | "failed" | "skipped";
+  reason?: string;
+}
+
 const FILE_CURATOR_SYSTEM_PROMPT = `You are the assistant's Writer Guardian.
 
 Your job:
@@ -86,9 +91,9 @@ export class FileCurator {
     this.llmService = llmService;
   }
 
-  async write(output: MemoryGateOutput): Promise<void> {
+  async write(output: MemoryGateOutput): Promise<FileCuratorWriteResult> {
     if (!isUpdateDecision(output.decision)) {
-      return;
+      return { status: "skipped", reason: "not an update decision" };
     }
 
     const candidateFact = output.candidateFact?.trim();
@@ -97,7 +102,7 @@ export class FileCurator {
         decision: output.decision,
         reason: output.reason,
       });
-      return;
+      return { status: "skipped", reason: "missing candidate fact" };
     }
 
     const targetFile = TARGET_FILES[output.decision];
@@ -121,24 +126,28 @@ export class FileCurator {
       });
 
       if (!result.didWrite) {
+        const reason = result.finalMessage ?? "Writer guardian finished without write";
         this.logger.info("FileCurator", "Guardian refused update", {
           decision: output.decision,
           filePath,
-          reason: result.finalMessage ?? "Writer guardian finished without write",
+          reason,
         });
-        return;
+        return { status: "refused", reason };
       }
 
       this.logger.info("FileCurator", "Writer guardian rewrote target file", {
         decision: output.decision,
         filePath,
       });
+      return { status: "written" };
     } catch (error) {
+      const reason = getErrorMessage(error);
       this.logger.error("FileCurator", "Writer guardian execution failed", {
         decision: output.decision,
         filePath,
-        reason: getErrorMessage(error),
+        reason,
       });
+      return { status: "failed", reason };
     }
   }
 

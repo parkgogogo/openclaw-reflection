@@ -4,6 +4,8 @@ import type { Logger, ReflectionMessage } from "./types.js";
 interface SessionData {
   buffer: CircularBuffer<ReflectionMessage>;
   lastAccessed: number;
+  processedAgentMessageIds: Set<string>;
+  pendingTask: Promise<void>;
 }
 
 export class SessionBufferManager {
@@ -17,7 +19,7 @@ export class SessionBufferManager {
     this.sessions = new Map();
   }
 
-  push(sessionKey: string, message: ReflectionMessage): void {
+  private getOrCreateSessionData(sessionKey: string): SessionData {
     let sessionData = this.sessions.get(sessionKey);
 
     if (!sessionData) {
@@ -30,9 +32,18 @@ export class SessionBufferManager {
       sessionData = {
         buffer: new CircularBuffer<ReflectionMessage>(this.capacity),
         lastAccessed: Date.now(),
+        processedAgentMessageIds: new Set<string>(),
+        pendingTask: Promise.resolve(),
       };
       this.sessions.set(sessionKey, sessionData);
     }
+
+    sessionData.lastAccessed = Date.now();
+    return sessionData;
+  }
+
+  push(sessionKey: string, message: ReflectionMessage): void {
+    const sessionData = this.getOrCreateSessionData(sessionKey);
 
     const evicted = sessionData.buffer.push(message);
     if (evicted) {
@@ -56,6 +67,31 @@ export class SessionBufferManager {
 
     sessionData.lastAccessed = Date.now();
     return sessionData.buffer.toArray();
+  }
+
+  hasProcessedAgentMessage(sessionKey: string, messageId: string): boolean {
+    const sessionData = this.sessions.get(sessionKey);
+    if (!sessionData) {
+      return false;
+    }
+
+    sessionData.lastAccessed = Date.now();
+    return sessionData.processedAgentMessageIds.has(messageId);
+  }
+
+  markProcessedAgentMessage(sessionKey: string, messageId: string): void {
+    const sessionData = this.getOrCreateSessionData(sessionKey);
+    sessionData.processedAgentMessageIds.add(messageId);
+  }
+
+  runExclusive(sessionKey: string, task: () => Promise<void>): Promise<void> {
+    const sessionData = this.getOrCreateSessionData(sessionKey);
+    const nextTask = sessionData.pendingTask
+      .catch(() => undefined)
+      .then(task);
+
+    sessionData.pendingTask = nextTask.catch(() => undefined);
+    return nextTask;
   }
 
   clearSession(sessionKey: string): void {
