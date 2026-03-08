@@ -9,7 +9,11 @@ These evals are intentionally independent from plugin runtime config.
 
 ## Provider Config
 
-Eval scripts should read provider settings from `.env` or process environment:
+The eval runner now supports two execution modes.
+
+### Single-model mode
+
+Use `.env` or process environment:
 
 - `EVAL_BASE_URL`
 - `EVAL_API_KEY`
@@ -22,6 +26,20 @@ Optional judge model settings:
 - `JUDGE_MODEL`
 
 If `JUDGE_*` is omitted, the eval runner may default to the same provider as `EVAL_*`.
+
+### Multi-model comparison mode
+
+Use `evals/models.json` to define the model matrix. Each profile stores:
+
+- `id`
+- `label`
+- `baseURL`
+- `apiKeyEnv`
+- `model`
+- `enabled`
+- optional `tags`
+
+The config file stores only the API key environment variable name, not the secret itself.
 
 Production plugin config is separate and must continue to use plugin `config.llm.*`.
 
@@ -53,6 +71,7 @@ evals/
           benchmark.jsonl
     write-guardian/
       benchmark.jsonl
+  models.json
 ```
 
 Default mode still reads:
@@ -77,6 +96,37 @@ node evals/run.mjs \
 ```
 
 For suite-specific runs, only the relevant dataset files are loaded. For example, `--suite memory-gate` does not require a write-guardian benchmark file.
+
+## Comparison Mode
+
+Run the same suite across multiple model profiles:
+
+```bash
+node evals/run.mjs \
+  --suite memory-gate \
+  --models-config evals/models.json \
+  --models grok-fast,gpt-5 \
+  --baseline grok-fast \
+  --output evals/results/2026-03-09-memory-gate-matrix.json \
+  --markdown-output evals/results/2026-03-09-memory-gate-matrix.md
+```
+
+Flags:
+
+- `--models-config <path>`: load model profiles from JSON
+- `--models <id1,id2,...>`: run only the selected enabled profiles
+- `--baseline <id>`: choose the comparison baseline
+- `--output <path>`: write machine-readable JSON
+- `--markdown-output <path>`: write human-readable Markdown
+
+The comparison report includes:
+
+- leaderboard ranking
+- baseline diffs
+- hardest cases
+- disagreement cases
+
+If `--models-config` is omitted, the runner stays in single-model mode and uses `EVAL_*`.
 
 ## Design Principles
 

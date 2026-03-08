@@ -196,7 +196,16 @@ pnpm run typecheck
 pnpm run eval:memory-gate
 pnpm run eval:write-guardian
 pnpm run eval:all
+
+node evals/run.mjs \
+  --suite memory-gate \
+  --models-config evals/models.json \
+  --baseline grok-fast \
+  --output evals/results/$(date +%F)-memory-gate-matrix.json \
+  --markdown-output evals/results/$(date +%F)-memory-gate-matrix.md
 ```
+
+`evals/models.json` defines the comparison matrix. JSON output is the source of truth for automation and history, while the Markdown artifact is the readable leaderboard summary.
 
 More eval details: [evals/README.md](./evals/README.md)
 

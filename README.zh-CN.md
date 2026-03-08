@@ -170,7 +170,16 @@ pnpm run typecheck
 pnpm run eval:memory-gate
 pnpm run eval:write-guardian
 pnpm run eval:all
+
+node evals/run.mjs \
+  --suite memory-gate \
+  --models-config evals/models.json \
+  --baseline grok-fast \
+  --output evals/results/$(date +%F)-memory-gate-matrix.json \
+  --markdown-output evals/results/$(date +%F)-memory-gate-matrix.md
 ```
+
+`evals/models.json` 用来定义多模型对比矩阵。JSON 输出是后续自动化和历史追踪的基准，Markdown 输出则是给人看的 leaderboard 摘要。
 
 更多评测说明见 [evals/README.md](./evals/README.md)。
 
