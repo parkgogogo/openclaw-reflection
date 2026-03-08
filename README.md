@@ -1,5 +1,7 @@
 # OpenClaw Reflection
 
+![OpenClaw Reflection logo](./assets/openclaw-reflection-logo.png)
+
 ![OpenClaw Plugin](https://img.shields.io/badge/OpenClaw-Plugin-111111?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square)
 ![memory_gate 18 cases](https://img.shields.io/badge/memory_gate-18%20benchmark%20cases-2ea043?style=flat-square)

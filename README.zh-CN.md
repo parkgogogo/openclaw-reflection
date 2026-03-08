@@ -1,5 +1,7 @@
 # OpenClaw Reflection
 
+![OpenClaw Reflection logo](./assets/openclaw-reflection-logo.png)
+
 英文版： [README.md](./README.md)
 
 ![OpenClaw Plugin](https://img.shields.io/badge/OpenClaw-Plugin-111111?style=flat-square)
