@@ -1,24 +1,22 @@
 # OpenClaw Plugin Install Skill
 
-This file is written for OpenClaw itself to follow when installing `@parkgogogo/openclaw-reflection`.
+Use this file when installing `@parkgogogo/openclaw-reflection`.
 
 ## Role
 
-Your job is to install the packaged plugin, gather the minimum required config from the operator, write the config under the correct plugin id, and verify that the gateway becomes healthy.
+Install the package, collect only missing config, write the plugin entry, validate config, and restart the gateway.
 
-Do not assume missing config values. Ask for them.
+## Ask Only If Missing
 
-## Ask First
+- `workspaceDir`
+  Recommendation: use OpenClaw's current workspace for the active profile.
+  Only ask if the current workspace is unknown or the operator wants a different one.
+- `llm.baseURL`
+- `llm.apiKey`
+- `llm.model`
+- whether the profile already uses `plugins.allow`
 
-Before writing config, ask the operator for the following values if they are not already known from the active profile:
-
-1. The target `workspaceDir`
-2. The LLM provider `baseURL`
-3. The LLM provider `apiKey`
-4. The LLM model id
-5. Whether the profile uses `plugins.allow`
-
-Use these defaults unless the operator asks for something else:
+## Defaults
 
 - `bufferSize`: `50`
 - `logLevel`: `info`
@@ -26,37 +24,32 @@ Use these defaults unless the operator asks for something else:
 - `memoryGate.windowSize`: `10`
 - `consolidation.enabled`: `false`
 - `consolidation.schedule`: `0 2 * * *`
+- recommended model: `x-ai/grok-4.1-fast`
 
-Recommended model:
+## Rules
 
-- `x-ai/grok-4.1-fast`
+- Install from npm, not a linked checkout.
+- Write config under `plugins.entries.openclaw-reflection`.
+- Do not leave `llm.baseURL`, `llm.apiKey`, or `llm.model` empty.
+- Only add `openclaw-reflection` to `plugins.allow` if the profile already uses an allowlist.
 
-## Install Rules
+## Steps
 
-- Use the packaged plugin from npm, not a linked checkout
-- Configure the plugin under `openclaw-reflection`
-- Do not leave `llm.baseURL`, `llm.apiKey`, or `llm.model` empty
-- Only add `openclaw-reflection` to `plugins.allow` if the profile already uses an allowlist
-
-## Install Steps
-
-### 1. Install The Package
-
-Run:
+### 1. Install
 
 ```bash
 openclaw plugins install @parkgogogo/openclaw-reflection@0.1.0
 ```
 
-### 2. Write The Plugin Config
+### 2. Write Config
 
-Write this under `plugins.entries.openclaw-reflection` in the active OpenClaw profile:
+Use the current OpenClaw workspace as `workspaceDir` unless the operator explicitly wants another workspace.
 
-```json
+```jsonc
 {
   "enabled": true,
   "config": {
-    "workspaceDir": "/absolute/path/to/agent-workspace",
+    "workspaceDir": "/absolute/path/to/current-openclaw-workspace",
     "bufferSize": 50,
     "logLevel": "info",
     "llm": {
@@ -76,25 +69,21 @@ Write this under `plugins.entries.openclaw-reflection` in the active OpenClaw pr
 }
 ```
 
-If the profile uses an allowlist, make sure `plugins.allow` contains:
+If the profile uses `plugins.allow`, ensure it contains:
 
 ```json
 ["openclaw-reflection"]
 ```
 
-### 3. Validate The Config
-
-Run:
+### 3. Validate
 
 ```bash
 openclaw config validate --json
 ```
 
-Do not continue if validation fails.
+Stop if validation fails.
 
-### 4. Start Or Restart The Gateway
-
-Run:
+### 4. Restart
 
 ```bash
 openclaw gateway restart
