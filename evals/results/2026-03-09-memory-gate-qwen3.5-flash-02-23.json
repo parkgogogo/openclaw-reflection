@@ -1,0 +1,242 @@
+{
+  "runId": "memory-gate-2026-03-08T18:02:26.346Z",
+  "timestamp": "2026-03-08T18:02:26.346Z",
+  "suite": "memory-gate",
+  "baselineModelId": "qwen3.5-flash-02-23",
+  "models": [
+    {
+      "modelId": "qwen3.5-flash-02-23",
+      "modelLabel": "Qwen 3.5 Flash 02-23",
+      "suite": "memory-gate",
+      "startedAt": "2026-03-08T18:00:46.282Z",
+      "finishedAt": "2026-03-08T18:02:26.346Z",
+      "summary": {
+        "total": 18,
+        "passed": 17,
+        "errorCounts": {
+          "provider_error": 0,
+          "schema_error": 1,
+          "execution_error": 0
+        }
+      },
+      "results": [
+        {
+          "scenarioId": "mg2_user_prefers_brutal_honesty",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_USER",
+          "expectedDecision": "UPDATE_USER",
+          "actualCandidateFact": "prefers direct code review style communication",
+          "expectedCandidateFact": "prefers direct technical feedback"
+        },
+        {
+          "scenarioId": "mg2_user_prefers_chinese_default",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_USER",
+          "expectedDecision": "UPDATE_USER",
+          "actualCandidateFact": "prefers default communication in Chinese unless specified otherwise",
+          "expectedCandidateFact": "prefers Chinese by default unless English is requested"
+        },
+        {
+          "scenarioId": "mg2_user_hates_surprise_rewrites",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_USER",
+          "expectedDecision": "UPDATE_USER",
+          "actualCandidateFact": "prefers confirmation before making big structural changes to files",
+          "expectedCandidateFact": "prefers reviewing major changes before large rewrites"
+        },
+        {
+          "scenarioId": "mg2_user_prefers_morning_checkins",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": false,
+          "actualDecision": "UPDATE_USER",
+          "expectedDecision": "UPDATE_USER",
+          "actualCandidateFact": "prefers important check-ins in the morning",
+          "expectedCandidateFact": "prefers important check-ins in the morning"
+        },
+        {
+          "scenarioId": "mg2_memory_shared_term_north_star",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_MEMORY",
+          "expectedDecision": "UPDATE_MEMORY",
+          "actualCandidateFact": "North Star document refers to internal strategic memo",
+          "expectedCandidateFact": "North Star document refers to the internal strategy memo, not the public roadmap"
+        },
+        {
+          "scenarioId": "mg2_memory_lesson_failed_retrospective",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_MEMORY",
+          "expectedDecision": "UPDATE_MEMORY",
+          "actualCandidateFact": "Previous weekly retro attempts became a formality",
+          "expectedCandidateFact": "Previous weekly retrospectives became performative and were not useful"
+        },
+        {
+          "scenarioId": "mg2_memory_private_context_family_health",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_MEMORY",
+          "expectedDecision": "UPDATE_MEMORY",
+          "actualCandidateFact": "Sudden user absences are typically due to family medical treatment (mom's chemotherapy)",
+          "expectedCandidateFact": "User may become unavailable unexpectedly due to a family member's chemotherapy treatment"
+        },
+        {
+          "scenarioId": "mg2_soul_refuse_when_unsure",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_SOUL",
+          "expectedDecision": "UPDATE_SOUL",
+          "actualCandidateFact": "Maintain conservative memory update policy: prefer writing less over polluting long-term memory files",
+          "expectedCandidateFact": "When uncertain about a long-term write, refuse rather than pollute memory"
+        },
+        {
+          "scenarioId": "mg2_soul_be_direct_and_non_sycophantic",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_SOUL",
+          "expectedDecision": "UPDATE_SOUL",
+          "actualCandidateFact": "Maintain direct, non-sycophantic, engineering-focused expression style",
+          "expectedCandidateFact": "Maintain a direct, non-sycophantic, engineering-focused style"
+        },
+        {
+          "scenarioId": "mg2_soul_disclose_soul_changes",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_USER",
+          "expectedDecision": "UPDATE_SOUL",
+          "actualCandidateFact": "prefers explicit notification before assistant modifies its SOUL configuration",
+          "expectedCandidateFact": "Disclose meaningful SOUL changes to the user"
+        },
+        {
+          "scenarioId": "mg2_identity_name_change",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": false,
+          "actualDecision": "UPDATE_IDENTITY",
+          "expectedDecision": "UPDATE_IDENTITY",
+          "actualCandidateFact": "Name is Echo",
+          "expectedCandidateFact": "Name is Echo"
+        },
+        {
+          "scenarioId": "mg2_identity_avatar_change",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_IDENTITY",
+          "expectedDecision": "UPDATE_IDENTITY",
+          "actualCandidateFact": "Avatar/style is clean minimalist fox",
+          "expectedCandidateFact": "Avatar/style is a clean minimalist fox"
+        },
+        {
+          "scenarioId": "mg2_identity_vibe_label",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_IDENTITY",
+          "expectedDecision": "UPDATE_IDENTITY",
+          "actualCandidateFact": "Avatar/style is calm, sharp, restrained",
+          "expectedCandidateFact": "Vibe is calm, sharp, and restrained"
+        },
+        {
+          "scenarioId": "mg2_tools_alias_mapping",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": true,
+          "actualDecision": "UPDATE_TOOLS",
+          "expectedDecision": "UPDATE_TOOLS",
+          "actualCandidateFact": "home-server SSH alias refers to devbox.internal on local machine",
+          "expectedCandidateFact": "home-server SSH alias refers to devbox.internal"
+        },
+        {
+          "scenarioId": "mg2_tools_refuse_runtime_claim",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "NO_WRITE"
+        },
+        {
+          "scenarioId": "mg2_no_write_smalltalk",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "NO_WRITE"
+        },
+        {
+          "scenarioId": "mg2_no_write_single_turn_tactic",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "NO_WRITE",
+          "errorType": "schema_error",
+          "error": "LLM request failed: Schema validation failed: $.candidate_fact should be a string"
+        },
+        {
+          "scenarioId": "mg2_no_write_active_project_thread",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "NO_WRITE"
+        }
+      ]
+    }
+  ],
+  "comparison": {
+    "ranking": [
+      {
+        "modelId": "qwen3.5-flash-02-23",
+        "passed": 17,
+        "total": 18,
+        "errorCounts": {
+          "provider_error": 0,
+          "schema_error": 1,
+          "execution_error": 0
+        }
+      }
+    ],
+    "baselineDiffs": [],
+    "hardestCases": [
+      {
+        "scenarioId": "mg2_soul_disclose_soul_changes",
+        "failedBy": [
+          "qwen3.5-flash-02-23"
+        ]
+      }
+    ],
+    "disagreementCases": []
+  }
+}

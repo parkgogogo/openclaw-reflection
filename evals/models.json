@@ -13,6 +13,41 @@
       "model": "openai/gpt-5",
       "enabled": false,
       "tags": ["reference"]
+    },
+    {
+      "id": "mercury-2",
+      "label": "Mercury 2",
+      "model": "inception/mercury-2",
+      "enabled": true,
+      "tags": ["comparison"]
+    },
+    {
+      "id": "gemini-2.5-flash-lite",
+      "label": "Gemini 2.5 Flash Lite",
+      "model": "google/gemini-2.5-flash-lite",
+      "enabled": true,
+      "tags": ["comparison", "cheap"]
+    },
+    {
+      "id": "gpt-4o-mini",
+      "label": "GPT-4o Mini",
+      "model": "openai/gpt-4o-mini",
+      "enabled": true,
+      "tags": ["comparison", "cheap"]
+    },
+    {
+      "id": "minimax-m2.5",
+      "label": "MiniMax M2.5",
+      "model": "minimax/minimax-m2.5",
+      "enabled": true,
+      "tags": ["comparison"]
+    },
+    {
+      "id": "qwen3.5-flash-02-23",
+      "label": "Qwen 3.5 Flash 02-23",
+      "model": "qwen/qwen3.5-flash-02-23",
+      "enabled": true,
+      "tags": ["comparison", "cheap"]
     }
   ]
 }

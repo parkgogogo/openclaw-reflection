@@ -1,0 +1,340 @@
+{
+  "runId": "memory-gate-2026-03-08T17:56:26.650Z",
+  "timestamp": "2026-03-08T17:56:26.650Z",
+  "suite": "memory-gate",
+  "baselineModelId": "gpt-4o-mini",
+  "models": [
+    {
+      "modelId": "gpt-4o-mini",
+      "modelLabel": "GPT-4o Mini",
+      "suite": "memory-gate",
+      "startedAt": "2026-03-08T17:56:12.302Z",
+      "finishedAt": "2026-03-08T17:56:26.650Z",
+      "summary": {
+        "total": 18,
+        "passed": 4,
+        "errorCounts": {
+          "provider_error": 18,
+          "schema_error": 0,
+          "execution_error": 0
+        }
+      },
+      "results": [
+        {
+          "scenarioId": "mg2_user_prefers_brutal_honesty",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_USER",
+          "expectedCandidateFact": "prefers direct technical feedback",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_user_prefers_chinese_default",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_USER",
+          "expectedCandidateFact": "prefers Chinese by default unless English is requested",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_user_hates_surprise_rewrites",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_USER",
+          "expectedCandidateFact": "prefers reviewing major changes before large rewrites",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_user_prefers_morning_checkins",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_USER",
+          "expectedCandidateFact": "prefers important check-ins in the morning",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_memory_shared_term_north_star",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_MEMORY",
+          "expectedCandidateFact": "North Star document refers to the internal strategy memo, not the public roadmap",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_memory_lesson_failed_retrospective",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_MEMORY",
+          "expectedCandidateFact": "Previous weekly retrospectives became performative and were not useful",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_memory_private_context_family_health",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_MEMORY",
+          "expectedCandidateFact": "User may become unavailable unexpectedly due to a family member's chemotherapy treatment",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_soul_refuse_when_unsure",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_SOUL",
+          "expectedCandidateFact": "When uncertain about a long-term write, refuse rather than pollute memory",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_soul_be_direct_and_non_sycophantic",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_SOUL",
+          "expectedCandidateFact": "Maintain a direct, non-sycophantic, engineering-focused style",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_soul_disclose_soul_changes",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_SOUL",
+          "expectedCandidateFact": "Disclose meaningful SOUL changes to the user",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_identity_name_change",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_IDENTITY",
+          "expectedCandidateFact": "Name is Echo",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_identity_avatar_change",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_IDENTITY",
+          "expectedCandidateFact": "Avatar/style is a clean minimalist fox",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_identity_vibe_label",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_IDENTITY",
+          "expectedCandidateFact": "Vibe is calm, sharp, and restrained",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_tools_alias_mapping",
+          "pass": false,
+          "decisionPass": false,
+          "candidatePass": false,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "UPDATE_TOOLS",
+          "expectedCandidateFact": "home-server SSH alias refers to devbox.internal",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_tools_refuse_runtime_claim",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "NO_WRITE",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_no_write_smalltalk",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "NO_WRITE",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_no_write_single_turn_tactic",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "NO_WRITE",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        },
+        {
+          "scenarioId": "mg2_no_write_active_project_thread",
+          "pass": true,
+          "decisionPass": true,
+          "candidatePass": true,
+          "judgeUsed": false,
+          "actualDecision": "NO_WRITE",
+          "expectedDecision": "NO_WRITE",
+          "errorType": "provider_error",
+          "error": "LLM request failed: Provider request failed with status 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\n  \\\"error\\\": {\\n    \\\"message\\\": \\\"Invalid schema for response_format 'structured_output': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Missing 'candidate_fact'.\\\",\\n    \\\"type\\\": \\\"invalid_request_error\\\",\\n    \\\"param\\\": \\\"response_format\\\",\\n    \\\"code\\\": null\\n  }\\n}\",\"provider_name\":\"Azure\",\"is_byok\":false}},\"user_id\":\"user_2tWCJRVKuvNgBj93l9eTb1ETsc4\"}"
+        }
+      ]
+    }
+  ],
+  "comparison": {
+    "ranking": [
+      {
+        "modelId": "gpt-4o-mini",
+        "passed": 4,
+        "total": 18,
+        "errorCounts": {
+          "provider_error": 18,
+          "schema_error": 0,
+          "execution_error": 0
+        }
+      }
+    ],
+    "baselineDiffs": [],
+    "hardestCases": [
+      {
+        "scenarioId": "mg2_identity_avatar_change",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_identity_name_change",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_identity_vibe_label",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_memory_lesson_failed_retrospective",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_memory_private_context_family_health",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_memory_shared_term_north_star",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_soul_be_direct_and_non_sycophantic",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_soul_disclose_soul_changes",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_soul_refuse_when_unsure",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_tools_alias_mapping",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_user_hates_surprise_rewrites",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_user_prefers_brutal_honesty",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_user_prefers_chinese_default",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      },
+      {
+        "scenarioId": "mg2_user_prefers_morning_checkins",
+        "failedBy": [
+          "gpt-4o-mini"
+        ]
+      }
+    ],
+    "disagreementCases": []
+  }
+}

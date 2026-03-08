@@ -209,6 +209,30 @@ node evals/run.mjs \
 
 More eval details: [evals/README.md](./evals/README.md)
 
+## Model Selection
+
+Benchmark date: `2026-03-09`  
+Scope: `memory_gate` only, `18` cases, shared OpenRouter-compatible `EVAL_*` route
+
+| Model | Pass/Total | Accuracy | Errors (P/S/E) | Recommendation | Best For |
+| --- | --- | --- | --- | --- | --- |
+| `x-ai/grok-4.1-fast` | `17/18` | `94.4%` | `0/0/0` | Default baseline | Daily eval baseline |
+| `qwen/qwen3.5-flash-02-23` | `17/18` | `94.4%` | `0/1/0` | Good backup option | Cost-sensitive cross-checks |
+| `google/gemini-2.5-flash-lite` | `16/18` | `88.9%` | `0/0/0` | Fast iteration candidate | Cheap prompt iteration |
+| `inception/mercury-2` | `11/18` | `61.1%` | `0/0/0` | Not recommended as default | Exploratory comparisons only |
+| `minimax/minimax-m2.5` | `9/18` | `50.0%` | `0/0/0` | Not recommended as default | Occasional sanity checks only |
+| `openai/gpt-4o-mini` | `4/18` | `22.2%` | `18/0/0` | Not recommended on current route | Avoid on current OpenRouter path |
+
+How to choose:
+
+- Default to `x-ai/grok-4.1-fast` because it had the best overall stability in this round with no internal errors.
+- Use `qwen/qwen3.5-flash-02-23` as the strongest backup when you want similar accuracy but can tolerate one schema failure in this benchmark.
+- Use `google/gemini-2.5-flash-lite` for cheaper, faster prompt iteration when slightly lower boundary accuracy is acceptable.
+- Avoid `inception/mercury-2` and `minimax/minimax-m2.5` as defaults because they frequently collapse `SOUL`, `IDENTITY`, or `NO_WRITE` boundaries into the wrong bucket.
+- Avoid `openai/gpt-4o-mini` on the current OpenRouter/Azure-backed route because all `18` cases surfaced provider-side structured-output errors.
+
+Source artifact: [2026-03-09-memory-gate-openrouter-model-benchmark.md](./evals/results/2026-03-09-memory-gate-openrouter-model-benchmark.md)
+
 ## Links
 
 - OpenClaw plugin docs: [docs.openclaw.ai/tools/plugin](https://docs.openclaw.ai/tools/plugin)

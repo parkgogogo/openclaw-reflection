@@ -183,6 +183,30 @@ node evals/run.mjs \
 
 更多评测说明见 [evals/README.md](./evals/README.md)。
 
+## 模型选择
+
+评测日期：`2026-03-09`  
+范围：仅 `memory_gate`，共 `18` 个 case，共享 OpenRouter 兼容的 `EVAL_*` 路由
+
+| 模型 | Pass/Total | 准确率 | 错误数 (P/S/E) | 建议 | 适用场景 |
+| --- | --- | --- | --- | --- | --- |
+| `x-ai/grok-4.1-fast` | `17/18` | `94.4%` | `0/0/0` | 默认基线 | 日常 eval 基线 |
+| `qwen/qwen3.5-flash-02-23` | `17/18` | `94.4%` | `0/1/0` | 优秀备选 | 对成本敏感的交叉验证 |
+| `google/gemini-2.5-flash-lite` | `16/18` | `88.9%` | `0/0/0` | 便宜快速候选 | 低成本 prompt 迭代 |
+| `inception/mercury-2` | `11/18` | `61.1%` | `0/0/0` | 不建议默认使用 | 仅做探索性对比 |
+| `minimax/minimax-m2.5` | `9/18` | `50.0%` | `0/0/0` | 不建议默认使用 | 偶尔做 sanity check |
+| `openai/gpt-4o-mini` | `4/18` | `22.2%` | `18/0/0` | 当前路由下不建议使用 | 避免在当前 OpenRouter 路径使用 |
+
+如何选择：
+
+- 默认优先用 `x-ai/grok-4.1-fast`，因为这一轮里它的整体稳定性最好，而且没有内部错误。
+- 如果想要接近的准确率，同时能接受一次 schema 失败，可以把 `qwen/qwen3.5-flash-02-23` 作为最强备选。
+- 如果更看重低成本和快速迭代，可以用 `google/gemini-2.5-flash-lite`，但要接受它在部分 `TOOLS` 边界上略弱。
+- 不要把 `inception/mercury-2` 和 `minimax/minimax-m2.5` 当默认基线，因为它们经常把 `SOUL`、`IDENTITY` 或 `NO_WRITE` 判到错误类别。
+- 当前 OpenRouter/Azure 路由下不要选 `openai/gpt-4o-mini`，因为 `18` 个 case 全都触发了 provider 侧 structured-output 错误。
+
+源结果见：[2026-03-09-memory-gate-openrouter-model-benchmark.md](./evals/results/2026-03-09-memory-gate-openrouter-model-benchmark.md)
+
 ## 链接
 
 - OpenClaw plugin docs: [docs.openclaw.ai/tools/plugin](https://docs.openclaw.ai/tools/plugin)
