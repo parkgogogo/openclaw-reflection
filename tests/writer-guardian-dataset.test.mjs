@@ -30,6 +30,37 @@ test("writer-guardian versioned datasets live under suite-version directories", 
   }
 });
 
+test("default shared and benchmark datasets include TOOLS.md coverage", () => {
+  const sharedScenarios = readJsonl("evals/datasets/shared/scenarios.jsonl");
+  const memoryGateCases = readJsonl("evals/datasets/memory-gate/benchmark.jsonl");
+  const writerGuardianCases = readJsonl("evals/datasets/writer-guardian/benchmark.jsonl");
+
+  assert.equal(sharedScenarios.length, 32);
+  assert.equal(memoryGateCases.length, 18);
+  assert.equal(writerGuardianCases.length, 14);
+
+  assert.equal(
+    sharedScenarios.some((scenario) => scenario.scenario_id === "mg2_tools_alias_mapping"),
+    true,
+    "missing shared memory-gate TOOLS scenario"
+  );
+  assert.equal(
+    sharedScenarios.some((scenario) => scenario.scenario_id === "wg_tools_add_alias_mapping"),
+    true,
+    "missing shared writer-guardian TOOLS scenario"
+  );
+  assert.equal(
+    memoryGateCases.some((scenario) => scenario.scenario_id === "mg2_tools_alias_mapping"),
+    true,
+    "missing memory-gate TOOLS benchmark case"
+  );
+  assert.equal(
+    writerGuardianCases.some((scenario) => scenario.scenario_id === "wg_tools_add_alias_mapping"),
+    true,
+    "missing writer-guardian TOOLS benchmark case"
+  );
+});
+
 test("writer-guardian v1-research benchmark has 16 cases and matching shared scenarios", () => {
   const scenarios = readJsonl("evals/datasets/writer-guardian/v1-research/shared/scenarios.jsonl");
   const benchmarkCases = readJsonl(

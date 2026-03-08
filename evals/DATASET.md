@@ -10,9 +10,9 @@
 
 当前规模：
 
-- shared scenarios: `28`
-- memory-gate benchmark cases: `16`
-- writer-guardian benchmark cases: `12`
+- shared scenarios: `32`
+- memory-gate benchmark cases: `18`
+- writer-guardian benchmark cases: `14`
 
 ## Shared Scenarios
 
@@ -210,6 +210,8 @@
 | `wg_identity_add_metadata_change`          | Write identity metadata change                | `UPDATE_IDENTITY` | `IDENTITY.md` | `Name is Lia`                                                                                            | 应写入          |
 | `wg_identity_refuse_non_identity_fact`     | Refuse non-identity fact in IDENTITY          | `UPDATE_IDENTITY` | `IDENTITY.md` | `Prefer direct technical feedback over fluff`                                                            | 应拒写          |
 | `wg_identity_refuse_preference_leak`       | Refuse user preference leaking into IDENTITY  | `UPDATE_IDENTITY` | `IDENTITY.md` | `User prefers Chinese by default`                                                                        | 应拒写          |
+| `wg_tools_add_alias_mapping`               | Write local SSH alias mapping                 | `UPDATE_TOOLS`    | `TOOLS.md`    | `home-server SSH alias refers to devbox.internal`                                                        | 应写入          |
+| `wg_tools_refuse_reusable_procedure`       | Refuse reusable procedure in TOOLS            | `UPDATE_TOOLS`    | `TOOLS.md`    | `Use the browser tool to open the dashboard before every deploy`                                         | 应拒写          |
 
 ## Memory Gate Benchmark
 
@@ -227,6 +229,8 @@
 | `mg_soul_keep_direct_engineering_style`        | `UPDATE_SOUL`     | `Maintain a direct, pragmatic, engineering-focused style`                                                | `core`     | `soul`, `style`, `positive`                   |
 | `mg_identity_name_changed`                     | `UPDATE_IDENTITY` | `Name is Lia`                                                                                            | `core`     | `identity`, `metadata`, `positive`            |
 | `mg_identity_avatar_changed`                   | `UPDATE_IDENTITY` | `Avatar/style is a calm minimalist cat vibe`                                                             | `boundary` | `identity`, `metadata`, `positive`            |
+| `mg2_tools_alias_mapping`                      | `UPDATE_TOOLS`    | `home-server SSH alias refers to devbox.internal`                                                        | `core`     | `tools`, `mapping`, `positive`                |
+| `mg2_tools_refuse_runtime_claim`               | `NO_WRITE`        | -                                                                                                        | `boundary` | `tools`, `runtime_claim`, `refusal`           |
 | `mg_no_write_smalltalk`                        | `NO_WRITE`        | -                                                                                                        | `core`     | `no_write`, `smalltalk`, `refusal`            |
 | `mg_no_write_temporary_mood`                   | `NO_WRITE`        | -                                                                                                        | `core`     | `no_write`, `temporary_signal`, `refusal`     |
 | `mg_no_write_single_turn_tactical_instruction` | `NO_WRITE`        | -                                                                                                        | `core`     | `no_write`, `single_turn_tactic`, `refusal`   |
@@ -266,15 +270,18 @@
 | `wg_identity_add_metadata_change`          | `IDENTITY.md` | `true`                | `update_identity_metadata` | `read -> write`     | contains `Name: Lia`, not contains `Name: Echo`                |
 | `wg_identity_refuse_non_identity_fact`     | `IDENTITY.md` | `false`               | `refuse_non_identity_fact` | `(none)` or `read`  | not contains `Prefer direct technical feedback`                |
 | `wg_identity_refuse_preference_leak`       | `IDENTITY.md` | `false`               | `refuse_preference_leak`   | `(none)` or `read`  | not contains `User prefers Chinese by default`                 |
+| `wg_tools_add_alias_mapping`               | `TOOLS.md`    | `true`                | `update_tools_mapping`     | `read -> write`     | contains `## SSH`, `home-server SSH alias refers to devbox.internal` |
+| `wg_tools_refuse_reusable_procedure`       | `TOOLS.md`    | `false`               | `refuse_reusable_procedure` | `(none)` or `read` | not contains `open the dashboard before every deploy`          |
 
 ## Coverage Intent
 
 当前这版 benchmark 主要覆盖这几类问题：
 
 - `memory-gate`
-  - `USER` / `SOUL` / `IDENTITY` / `NO_WRITE` 四类当前目标路由
+  - `USER` / `SOUL` / `IDENTITY` / `TOOLS` / `NO_WRITE` 五类当前目标路由
   - 稳定偏好 vs 单轮战术
   - 持久原则 vs 用户偏好
+  - 本地 tool mapping vs runtime capability claim
   - 长期记忆写入与 project/topic facts 的收敛边界
   - 当前阶段 project facts / active threads / next steps 一律视为 `NO_WRITE`
 

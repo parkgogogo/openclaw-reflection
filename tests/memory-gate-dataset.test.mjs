@@ -14,7 +14,7 @@ function readJsonl(relativePath) {
   return content.split("\n").map((line) => JSON.parse(line));
 }
 
-test("memory-gate dataset uses the v2 16-case benchmark", () => {
+test("memory-gate default dataset includes TOOLS.md routing coverage", () => {
   const scenarios = readJsonl("evals/datasets/shared/scenarios.jsonl");
   const benchmarkCases = readJsonl("evals/datasets/memory-gate/benchmark.jsonl");
 
@@ -22,7 +22,7 @@ test("memory-gate dataset uses the v2 16-case benchmark", () => {
   const scenarioIds = new Set(memoryGateScenarios.map((scenario) => scenario.scenario_id));
   const benchmarkIds = benchmarkCases.map((benchmarkCase) => benchmarkCase.scenario_id);
 
-  assert.equal(benchmarkCases.length, 16);
+  assert.equal(benchmarkCases.length, 18);
   assert.deepEqual(benchmarkIds, [
     "mg2_user_prefers_brutal_honesty",
     "mg2_user_prefers_chinese_default",
@@ -37,6 +37,8 @@ test("memory-gate dataset uses the v2 16-case benchmark", () => {
     "mg2_identity_name_change",
     "mg2_identity_avatar_change",
     "mg2_identity_vibe_label",
+    "mg2_tools_alias_mapping",
+    "mg2_tools_refuse_runtime_claim",
     "mg2_no_write_smalltalk",
     "mg2_no_write_single_turn_tactic",
     "mg2_no_write_active_project_thread",

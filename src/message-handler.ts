@@ -509,12 +509,18 @@ function findLatestMessageByRole(
 
 function isUpdateDecision(
   decision: MemoryGateOutput["decision"]
-): decision is "UPDATE_MEMORY" | "UPDATE_USER" | "UPDATE_SOUL" | "UPDATE_IDENTITY" {
+): decision is
+  | "UPDATE_MEMORY"
+  | "UPDATE_USER"
+  | "UPDATE_SOUL"
+  | "UPDATE_IDENTITY"
+  | "UPDATE_TOOLS" {
   return (
     decision === "UPDATE_MEMORY" ||
     decision === "UPDATE_USER" ||
     decision === "UPDATE_SOUL" ||
-    decision === "UPDATE_IDENTITY"
+    decision === "UPDATE_IDENTITY" ||
+    decision === "UPDATE_TOOLS"
   );
 }
 

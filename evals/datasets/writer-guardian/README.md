@@ -4,6 +4,8 @@ Active default dataset:
 
 - `benchmark.jsonl`
 
+The active default dataset now includes `TOOLS.md` write and refusal coverage for local mappings versus reusable procedures.
+
 Versioned datasets:
 
 - `v1-research/`

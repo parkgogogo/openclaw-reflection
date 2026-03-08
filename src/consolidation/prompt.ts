@@ -4,6 +4,7 @@ Inputs:
 - Current MEMORY.md
 - Current USER.md
 - Current SOUL.md
+- Current TOOLS.md
 
 Task:
 - Decide whether cleanup is needed
@@ -18,6 +19,8 @@ Rules:
 - Do NOT invent new facts
 - SOUL.md updates should be low-frequency
 - IDENTITY.md is out of scope
+- TOOLS.md cleanup should stay narrow: merge duplicate mappings, remove stale aliases, and keep local tool notes compact
+- Do not infer runtime tool availability from TOOLS.md
 
 Output JSON only:
 {
@@ -38,6 +41,13 @@ Output JSON only:
       }
     ],
     "SOUL.md": [
+      {
+        "section": "target section",
+        "action": "add|replace|remove",
+        "content": "new markdown content"
+      }
+    ],
+    "TOOLS.md": [
       {
         "section": "target section",
         "action": "add|replace|remove",

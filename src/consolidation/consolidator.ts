@@ -10,7 +10,12 @@ import type {
   ConsolidationResult,
 } from "./types.js";
 
-const MANAGED_FILES: ConsolidatedFilename[] = ["MEMORY.md", "USER.md", "SOUL.md"];
+const MANAGED_FILES: ConsolidatedFilename[] = [
+  "MEMORY.md",
+  "USER.md",
+  "SOUL.md",
+  "TOOLS.md",
+];
 const VALID_PATCH_ACTIONS = new Set<ConsolidationPatch["action"]>([
   "add",
   "replace",
@@ -56,6 +61,19 @@ const CONSOLIDATION_RESPONSE_SCHEMA: JsonSchema = {
           },
         },
         "SOUL.md": {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["section", "action", "content"],
+            properties: {
+              section: { type: "string" },
+              action: { type: "string", enum: ["add", "replace", "remove"] },
+              content: { type: "string" },
+            },
+          },
+        },
+        "TOOLS.md": {
           type: "array",
           items: {
             type: "object",
@@ -211,6 +229,9 @@ export class Consolidator {
       "",
       "Current SOUL.md:",
       currentFiles["SOUL.md"].trim() || "(empty)",
+      "",
+      "Current TOOLS.md:",
+      currentFiles["TOOLS.md"].trim() || "(empty)",
       "",
       "Return JSON only as specified in the system prompt.",
     ].join("\n");

@@ -3,7 +3,11 @@ export interface ConsolidationConfig {
   schedule: string;
 }
 
-export type ConsolidatedFilename = "MEMORY.md" | "USER.md" | "SOUL.md";
+export type ConsolidatedFilename =
+  | "MEMORY.md"
+  | "USER.md"
+  | "SOUL.md"
+  | "TOOLS.md";
 
 export interface ConsolidationPatch {
   section: string;

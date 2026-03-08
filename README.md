@@ -33,7 +33,7 @@ Reflection is built to fix both.
 
 - Keep stable user preferences and collaboration habits
 - Preserve durable shared context across sessions
-- Separate memory into `MEMORY.md`, `USER.md`, `SOUL.md`, and `IDENTITY.md`
+- Separate memory into `MEMORY.md`, `USER.md`, `SOUL.md`, `IDENTITY.md`, and `TOOLS.md`
 - Refuse one-off tasks, active thread chatter, and misrouted writes
 - Periodically consolidate memory so it stays usable
 
@@ -132,7 +132,7 @@ flowchart LR
   B --> C["memoryGate"]
   C -->|durable fact| D["Writer guardian"]
   C -->|thread noise| E["No write"]
-  D --> F["MEMORY.md / USER.md / SOUL.md / IDENTITY.md"]
+  D --> F["MEMORY.md / USER.md / SOUL.md / IDENTITY.md / TOOLS.md"]
   F --> G["Scheduled consolidation"]
 ```
 
@@ -141,6 +141,7 @@ In practice, the pipeline is simple:
 1. Reflection captures conversation context from OpenClaw hooks.
 2. `memoryGate` decides whether the candidate fact is durable enough to keep.
 3. A file-specific guardian either rewrites the target memory file or refuses the write.
+4. Scheduled consolidation keeps `MEMORY.md`, `USER.md`, `SOUL.md`, and `TOOLS.md` compact over time.
 
 ## Proof, Not Just Promises
 
@@ -155,6 +156,7 @@ These evals focus on the failure modes that make long-term memory systems unreli
 - keeping user facts out of the wrong file
 - preserving `SOUL` continuity rules
 - replacing outdated `IDENTITY` metadata correctly
+- keeping local tool mappings in `TOOLS.md` without turning it into a tool registry
 
 ## The Memory Files
 
@@ -164,6 +166,7 @@ These evals focus on the failure modes that make long-term memory systems unreli
 | `USER.md` | Stable user preferences, collaboration style, helpful personal context |
 | `SOUL.md` | Assistant principles, boundaries, and continuity rules |
 | `IDENTITY.md` | Explicit identity metadata such as name, vibe, or avatar-style descriptors |
+| `TOOLS.md` | Environment-specific tool aliases, endpoints, device names, and local tool mappings |
 
 ## Advanced Configuration
 

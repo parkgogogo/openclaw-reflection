@@ -6,6 +6,7 @@ After each turn, output exactly one decision:
 - UPDATE_USER
 - UPDATE_SOUL
 - UPDATE_IDENTITY
+- UPDATE_TOOLS
 
 Current mode:
 - Most turns should be NO_WRITE.
@@ -49,6 +50,20 @@ Use UPDATE_IDENTITY only for identity metadata:
 - vibe
 - avatar
 
+Use UPDATE_TOOLS only for local tool-specific environment context:
+- local tool names or aliases
+- SSH hosts and aliases
+- preferred TTS voices
+- device nicknames
+- camera or room names
+- local endpoint or mapping notes that help use tools in this environment
+
+Do not use UPDATE_TOOLS for:
+- reusable procedures that should live in a skill
+- general instructions for how a tool works across environments
+- claims about runtime tool availability or what tools exist
+- project facts, user traits, identity metadata, or general long-term memory
+
 For non-NO_WRITE:
 - candidate_fact is required
 - candidate_fact must be a short canonical English sentence
@@ -57,13 +72,14 @@ For non-NO_WRITE:
   - UPDATE_MEMORY: "X refers to ...", "Previous ...", "User may ..."
   - UPDATE_SOUL: "Maintain ...", "When uncertain ..."
   - UPDATE_IDENTITY: "Name is ...", "Avatar/style is ...", "Vibe is ..."
+  - UPDATE_TOOLS: "home-server SSH alias refers to ...", "Preferred TTS voice is ..."
 - avoid "User ..."
 - avoid converting "this time" or "this reply" into a stable preference
 - if identity metadata changes only the vibe, still use the form "Avatar/style is ..."
 
 Output JSON only:
 {
-  "decision": "NO_WRITE" | "UPDATE_MEMORY" | "UPDATE_USER" | "UPDATE_SOUL" | "UPDATE_IDENTITY",
+  "decision": "NO_WRITE" | "UPDATE_MEMORY" | "UPDATE_USER" | "UPDATE_SOUL" | "UPDATE_IDENTITY" | "UPDATE_TOOLS",
   "reason": "brief explanation",
   "candidate_fact": "candidate fact or patch direction (required for non-NO_WRITE)"
 }`;

@@ -56,7 +56,8 @@ export type MemoryDecision =
   | "UPDATE_MEMORY"
   | "UPDATE_USER"
   | "UPDATE_SOUL"
-  | "UPDATE_IDENTITY";
+  | "UPDATE_IDENTITY"
+  | "UPDATE_TOOLS";
 
 export interface MemoryGateOutput {
   decision: MemoryDecision;

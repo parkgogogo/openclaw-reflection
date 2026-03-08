@@ -11,6 +11,8 @@
 {"scenario_id":"mg2_identity_name_change","expected_decision":"UPDATE_IDENTITY","expected_candidate_fact":"Name is Echo","allowed_candidate_fact_variants":["identity name is Echo"],"severity":"core","tags":["identity","metadata","positive"]}
 {"scenario_id":"mg2_identity_avatar_change","expected_decision":"UPDATE_IDENTITY","expected_candidate_fact":"Avatar/style is a clean minimalist fox","allowed_candidate_fact_variants":["avatar is a clean minimalist fox"],"severity":"core","tags":["identity","metadata","positive"]}
 {"scenario_id":"mg2_identity_vibe_label","expected_decision":"UPDATE_IDENTITY","expected_candidate_fact":"Vibe is calm, sharp, and restrained","allowed_candidate_fact_variants":["identity vibe is calm, sharp, and restrained"],"severity":"boundary","tags":["identity","metadata","positive"]}
+{"scenario_id":"mg2_tools_alias_mapping","expected_decision":"UPDATE_TOOLS","expected_candidate_fact":"home-server SSH alias refers to devbox.internal","allowed_candidate_fact_variants":["home-server alias refers to devbox.internal","home-server refers to devbox.internal"],"severity":"core","tags":["tools","mapping","positive"]}
+{"scenario_id":"mg2_tools_refuse_runtime_claim","expected_decision":"NO_WRITE","severity":"boundary","tags":["tools","runtime_claim","refusal"]}
 {"scenario_id":"mg2_no_write_smalltalk","expected_decision":"NO_WRITE","severity":"core","tags":["no_write","smalltalk","refusal"]}
 {"scenario_id":"mg2_no_write_single_turn_tactic","expected_decision":"NO_WRITE","severity":"core","tags":["no_write","single_turn_tactic","refusal"]}
 {"scenario_id":"mg2_no_write_active_project_thread","expected_decision":"NO_WRITE","severity":"core","tags":["no_write","active_thread","refusal"]}

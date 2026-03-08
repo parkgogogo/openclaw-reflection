@@ -32,6 +32,11 @@ test("Consolidator uses cleanup decision and LLM proposed updates on long-term f
     "# SOUL\n\n## Communication Style\n- too wordy\n",
     "utf8"
   );
+  await writeFile(
+    path.join(workspaceDir, "TOOLS.md"),
+    "# TOOLS\n\n## SSH\n- old-alias refers to old-host\n- old-alias refers to old-host\n",
+    "utf8"
+  );
 
   let calls = 0;
   const llmService = {
@@ -61,6 +66,13 @@ test("Consolidator uses cleanup decision and LLM proposed updates on long-term f
               content: "- concise, direct, technically rigorous",
             },
           ],
+          "TOOLS.md": [
+            {
+              section: "SSH",
+              action: "replace",
+              content: "- home-server SSH alias refers to devbox.internal",
+            },
+          ],
         },
       };
     },
@@ -80,6 +92,7 @@ test("Consolidator uses cleanup decision and LLM proposed updates on long-term f
     const memoryContent = await readFile(path.join(workspaceDir, "MEMORY.md"), "utf8");
     const userContent = await readFile(path.join(workspaceDir, "USER.md"), "utf8");
     const soulContent = await readFile(path.join(workspaceDir, "SOUL.md"), "utf8");
+    const toolsContent = await readFile(path.join(workspaceDir, "TOOLS.md"), "utf8");
 
     assert.equal(calls, 1, "expected Consolidator to call the LLM exactly once");
     assert.ok(
@@ -93,6 +106,10 @@ test("Consolidator uses cleanup decision and LLM proposed updates on long-term f
     assert.ok(
       soulContent.includes("- concise, direct, technically rigorous"),
       "expected SOUL.md to be updated from LLM output"
+    );
+    assert.ok(
+      toolsContent.includes("- home-server SSH alias refers to devbox.internal"),
+      "expected TOOLS.md to be updated from LLM output"
     );
     assert.ok(
       Object.prototype.hasOwnProperty.call(result.updates, "MEMORY.md"),

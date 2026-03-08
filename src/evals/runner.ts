@@ -25,7 +25,7 @@ export interface SharedScenario {
   gate_decision?: MemoryGateOutput["decision"];
   gate_reason?: string;
   candidate_fact?: string;
-  target_file?: "MEMORY.md" | "USER.md" | "SOUL.md" | "IDENTITY.md";
+  target_file?: "MEMORY.md" | "USER.md" | "SOUL.md" | "IDENTITY.md" | "TOOLS.md";
   current_file_content?: string;
   notes: string;
 }

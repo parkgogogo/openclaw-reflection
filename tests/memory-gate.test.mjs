@@ -52,13 +52,16 @@ test("MemoryGateAnalyzer consumes structured object output from LLMService", asy
   );
 });
 
-test("memory gate system prompt includes explicit routing guidance for USER, MEMORY, SOUL, and IDENTITY", () => {
+test("memory gate system prompt includes explicit routing guidance for USER, MEMORY, SOUL, IDENTITY, and TOOLS", () => {
   assert.doesNotMatch(MEMORY_GATE_SYSTEM_PROMPT, /Lia/);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /UPDATE_USER[\s\S]*language/i);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /UPDATE_SOUL[\s\S]*behavioral principle/i);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /even if proposed by the user/i);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /general manner[\s\S]*UPDATE_SOUL/i);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /UPDATE_IDENTITY[\s\S]*name/i);
+  assert.match(MEMORY_GATE_SYSTEM_PROMPT, /UPDATE_TOOLS[\s\S]*local tool/i);
+  assert.match(MEMORY_GATE_SYSTEM_PROMPT, /ssh[\s\S]*alias|alias[\s\S]*ssh/i);
+  assert.match(MEMORY_GATE_SYSTEM_PROMPT, /runtime tool availability/i);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /UPDATE_MEMORY[\s\S]*shared context/i);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /UPDATE_MEMORY[\s\S]*lesson/i);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /UPDATE_MEMORY[\s\S]*private context/i);
@@ -77,6 +80,33 @@ test("memory gate system prompt includes explicit routing guidance for USER, MEM
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /direct[\s\S]*non-sycophantic[\s\S]*UPDATE_SOUL/i);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /direct code review style[\s\S]*UPDATE_USER/i);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /memory update policy or write policy[\s\S]*UPDATE_SOUL/i);
+});
+
+test("MemoryGateAnalyzer accepts UPDATE_TOOLS responses from the LLM", async () => {
+  const analyzer = new MemoryGateAnalyzer(
+    {
+      async generateObject() {
+        return {
+          decision: "UPDATE_TOOLS",
+          reason: "local ssh alias mapping",
+          candidate_fact: "home-server SSH alias refers to devbox.internal",
+        };
+      },
+    },
+    createLogger()
+  );
+
+  const result = await analyzer.analyze({
+    recentMessages: [],
+    currentUserMessage: "记一下 home-server 其实是 devbox.internal。",
+    currentAgentReply: "收到，以后 home-server 这个别名指向 devbox.internal。",
+  });
+
+  assert.deepEqual(result, {
+    decision: "UPDATE_TOOLS",
+    reason: "local ssh alias mapping",
+    candidateFact: "home-server SSH alias refers to devbox.internal",
+  });
 });
 
 test("memory gate prompt asks for a canonical concise English candidate fact", () => {

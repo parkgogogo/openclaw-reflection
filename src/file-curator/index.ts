@@ -6,9 +6,15 @@ type UpdateDecision =
   | "UPDATE_MEMORY"
   | "UPDATE_USER"
   | "UPDATE_SOUL"
-  | "UPDATE_IDENTITY";
+  | "UPDATE_IDENTITY"
+  | "UPDATE_TOOLS";
 
-type CuratedFilename = "MEMORY.md" | "USER.md" | "SOUL.md" | "IDENTITY.md";
+type CuratedFilename =
+  | "MEMORY.md"
+  | "USER.md"
+  | "SOUL.md"
+  | "IDENTITY.md"
+  | "TOOLS.md";
 
 interface FileCuratorConfig {
   workspaceDir: string;
@@ -36,6 +42,7 @@ File meanings:
 - USER.md: about your human. Keep stable preferences, collaboration style, and helpful personal context. Do not turn this into a dossier. Reject project chatter in USER.md, one-off tactics, temporary moods, and surveillance-style detail.
 - SOUL.md: the assistant's enduring principles, boundaries, continuity rules, and general voice. General write-policy or disclosure-policy rules can belong here. Reject temporary tone shifts, project tactics, user profile facts, and identity metadata.
 - IDENTITY.md: Identity metadata only. Keep name, creature, vibe, emoji, avatar, or equivalent identity metadata. If the candidate fact is an explicit metadata change, write it and replace existing metadata when needed. Reject anything that is not identity metadata.
+- TOOLS.md: environment-specific tool context only. Keep local aliases, endpoints, room or device names, preferred TTS voices, and other local mappings that help the assistant use tools correctly in this workspace. Reject reusable procedures that belong in a skill, runtime tool availability claims, user facts, identity metadata, and general long-term memory.
 
 Hard constraints:
 - Only reason about the target file you were given
@@ -50,6 +57,7 @@ const TARGET_FILES: Record<UpdateDecision, CuratedFilename> = {
   UPDATE_USER: "USER.md",
   UPDATE_SOUL: "SOUL.md",
   UPDATE_IDENTITY: "IDENTITY.md",
+  UPDATE_TOOLS: "TOOLS.md",
 };
 
 function isUpdateDecision(
@@ -59,7 +67,8 @@ function isUpdateDecision(
     decision === "UPDATE_MEMORY" ||
     decision === "UPDATE_USER" ||
     decision === "UPDATE_SOUL" ||
-    decision === "UPDATE_IDENTITY"
+    decision === "UPDATE_IDENTITY" ||
+    decision === "UPDATE_TOOLS"
   );
 }
 

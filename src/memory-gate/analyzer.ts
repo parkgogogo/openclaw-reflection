@@ -12,6 +12,7 @@ const VALID_DECISIONS: ReadonlySet<MemoryDecision> = new Set([
   "UPDATE_USER",
   "UPDATE_SOUL",
   "UPDATE_IDENTITY",
+  "UPDATE_TOOLS",
 ]);
 
 function getNonEmptyString(value: unknown): string | undefined {
@@ -44,6 +45,7 @@ const MEMORY_GATE_RESPONSE_SCHEMA: JsonSchema = {
         "UPDATE_USER",
         "UPDATE_SOUL",
         "UPDATE_IDENTITY",
+        "UPDATE_TOOLS",
       ],
     },
     reason: { type: "string" },
@@ -137,10 +139,12 @@ export class MemoryGateAnalyzer {
       "- If it is a general rule for how the assistant should behave, prefer UPDATE_SOUL.",
       "- If it is mainly about this user's personal working preference, prefer UPDATE_USER.",
       "- Is this about identity metadata such as name, vibe, or avatar? If yes, prefer UPDATE_IDENTITY.",
+      "- Is this about local tool names, aliases, endpoints, preferred voices, device nicknames, camera names, room names, or environment-specific tool mappings? If yes, prefer UPDATE_TOOLS.",
+      "- If it is a reusable procedure for how to use a tool across environments, or a claim about runtime tool availability, do not use UPDATE_TOOLS.",
       "- Is this a project fact, architecture decision, active thread, next step, topic update, small talk, temporary emotion, or one-off tactic? If yes, choose NO_WRITE.",
       "",
       "For non-NO_WRITE decisions, write candidate_fact as a short canonical English sentence.",
-      'Prefer concise canonical phrasing like "prefers ...", "prefers important check-ins in the morning", "X refers to ...", "Maintain ...", or "Name is ...".',
+      'Prefer concise canonical phrasing like "prefers ...", "prefers important check-ins in the morning", "X refers to ...", "Maintain ...", "Name is ...", or "home-server SSH alias refers to devbox.internal".',
       'For morning cadence cases, prefer exactly "prefers important check-ins in the morning".',
       "",
       "Return JSON only as specified in the system prompt.",

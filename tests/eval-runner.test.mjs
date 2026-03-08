@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   evaluateMemoryGateBenchmark,
   evaluateWriterGuardianBenchmark,
+  runWriterGuardianCase,
 } from "../dist/evals/runner.js";
 
 test("evaluateMemoryGateBenchmark supports judge-backed semantic candidate matching", async () => {
@@ -223,4 +224,46 @@ test("evaluateWriterGuardianBenchmark continues after per-case execution error",
   assert.equal(result.results[0].pass, false);
   assert.match(result.results[0].error, /writer provider timeout/);
   assert.equal(result.results[1].pass, true);
+});
+
+test("runWriterGuardianCase supports TOOLS.md scenarios", async () => {
+  const result = await runWriterGuardianCase({
+    scenario: {
+      scenario_id: "wg_tools_case",
+      title: "Write local ssh alias",
+      gate_decision: "UPDATE_TOOLS",
+      gate_reason: "local ssh alias mapping",
+      candidate_fact: "home-server SSH alias refers to devbox.internal",
+      target_file: "TOOLS.md",
+      current_file_content: "# TOOLS\n\n## SSH\n- old-alias refers to old-host\n",
+      notes: "test case",
+    },
+    llmService: {
+      async generateObject() {
+        throw new Error("not used");
+      },
+      async runAgent(params) {
+        const readTool = params.tools.find((tool) => tool.name === "read");
+        const writeTool = params.tools.find((tool) => tool.name === "write");
+        const current = await readTool.execute({});
+        assert.match(current, /old-alias refers to old-host/);
+        await writeTool.execute({
+          content:
+            "# TOOLS\n\n## SSH\n- old-alias refers to old-host\n- home-server SSH alias refers to devbox.internal\n",
+        });
+        return {
+          didWrite: true,
+          finalMessage: "updated",
+          steps: [
+            { type: "tool", toolName: "read", input: {}, output: current },
+            { type: "tool", toolName: "write", input: {}, output: "ok" },
+          ],
+        };
+      },
+    },
+  });
+
+  assert.equal(result.shouldWrite, true);
+  assert.deepEqual(result.toolTrace, ["read", "write"]);
+  assert.match(result.finalContent, /home-server SSH alias refers to devbox\.internal/);
 });

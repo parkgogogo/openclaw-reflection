@@ -186,6 +186,64 @@ test("FileCurator logs guardian refusal and leaves the target file untouched", a
   }
 });
 
+test("FileCurator routes UPDATE_TOOLS writes to TOOLS.md", async () => {
+  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "reflection-curator-"));
+  const toolsFile = path.join(workspaceDir, "TOOLS.md");
+
+  await writeFile(
+    toolsFile,
+    "# TOOLS\n\n## SSH\n- old-alias refers to old-host\n",
+    "utf8"
+  );
+
+  const llmService = {
+    async runAgent(params) {
+      assert.match(
+        params.systemPrompt,
+        /TOOLS\.md[\s\S]*environment-specific tool context/i,
+        "writer guardian prompt should define TOOLS.md scope"
+      );
+      assert.match(
+        params.systemPrompt,
+        /reusable procedures[\s\S]*skill/i,
+        "writer guardian prompt should reject reusable instructions in TOOLS.md"
+      );
+
+      const readTool = params.tools.find((tool) => tool.name === "read");
+      const writeTool = params.tools.find((tool) => tool.name === "write");
+      const current = await readTool.execute({});
+
+      assert.match(current, /old-alias refers to old-host/);
+
+      await writeTool.execute({
+        content:
+          "# TOOLS\n\n## SSH\n- old-alias refers to old-host\n- home-server SSH alias refers to devbox.internal\n",
+      });
+
+      return {
+        didWrite: true,
+        finalMessage: "updated tools",
+        steps: [],
+      };
+    },
+  };
+
+  try {
+    const curator = new FileCurator({ workspaceDir }, createLogger(), llmService);
+    const result = await curator.write({
+      decision: "UPDATE_TOOLS",
+      reason: "local ssh alias mapping",
+      candidateFact: "home-server SSH alias refers to devbox.internal",
+    });
+
+    const content = await readFile(toolsFile, "utf8");
+    assert.deepEqual(result, { status: "written" });
+    assert.match(content, /home-server SSH alias refers to devbox\.internal/);
+  } finally {
+    await rm(workspaceDir, { recursive: true, force: true });
+  }
+});
+
 test("FileCurator returns failed status when writer guardian execution fails", async () => {
   const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "reflection-curator-"));
   const logger = createLogger();
