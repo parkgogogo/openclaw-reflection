@@ -1,5 +1,5 @@
 {
-  "id": "reflection-plugin",
+  "id": "openclaw-reflection",
   "entry": "src/index.ts",
   "configSchema": {
     "type": "object",

@@ -76,7 +76,7 @@ Because this plugin imports npm dependencies, local linked development should ke
 
 ### Add the plugin config
 
-Put the following under `plugins.entries.reflection-plugin` in your OpenClaw config:
+Put the following under `plugins.entries.openclaw-reflection` in your OpenClaw config:
 
 ```json
 {
@@ -200,6 +200,12 @@ pnpm run eval:all
 ```
 
 More eval details: [evals/README.md](./evals/README.md)
+
+Fast packaged-plugin regression on a reused local OpenClaw profile:
+
+```bash
+pnpm run e2e:openclaw-plugin
+```
 
 ## Links
 
