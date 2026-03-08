@@ -36,9 +36,45 @@ test('activate registers message hooks through registerHook when api.on is unava
 
   const events = registered.map((entry) => entry.event);
   assert.deepEqual(events, [
+    'message:sending',
     'message:received',
-    'message:sent',
     'command:new',
     'command:reset',
   ]);
+});
+
+test('activate prefers api.on for before_message_write/message_received and keeps legacy sending hook', async () => {
+  const indexUrl = pathToFileURL(path.join(process.cwd(), 'dist/index.js')).href;
+  const mod = await import(`${indexUrl}?t=${Date.now()}-legacy`);
+  const activate = mod.default;
+
+  const registered = [];
+  const observed = [];
+  const api = {
+    logger: createPluginLogger(),
+    config: {
+      get(key) {
+        if (key === 'memoryGate') return { enabled: false };
+        if (key === 'consolidation') return { enabled: false };
+        return undefined;
+      },
+    },
+    registerHook(event, handler) {
+      registered.push({ event, handler });
+    },
+    on(event, handler) {
+      observed.push({ event, handler });
+    },
+  };
+
+  activate(api);
+
+  assert.deepEqual(
+    observed.map((entry) => entry.event),
+    ['before_message_write', 'message_received']
+  );
+  assert.deepEqual(
+    registered.map((entry) => entry.event),
+    ['message:sending', 'command:new', 'command:reset']
+  );
 });

@@ -9,8 +9,9 @@ import {
   MemoryGateAnalyzer,
 } from "./memory-gate/index.js";
 import {
+  handleBeforeMessageWrite,
   handleMessageReceived,
-  handleMessageSent,
+  logHookPayloadDebug,
   handleSessionEnd,
 } from "./message-handler.js";
 import { SessionBufferManager } from "./session-manager.js";
@@ -105,16 +106,20 @@ function runHookSafely(
 
 function registerMessageHook(
   api: PluginAPI,
-  hookName: "message_received" | "message_sent",
-  handler: (event: unknown, context?: unknown) => void
+  hookName: "message_received" | "message_sending",
+  handler: (event: unknown, context?: unknown) => unknown
 ): void {
-  if (typeof api.on === "function") {
+  const shouldUseLegacyHookName = hookName === "message_sending";
+
+  if (!shouldUseLegacyHookName && typeof api.on === "function") {
     api.on(hookName, handler);
     return;
   }
 
   const fallbackHookName =
-    hookName === "message_received" ? "message:received" : "message:sent";
+    hookName === "message_received"
+      ? "message:received"
+      : "message:sending";
 
   api.registerHook(fallbackHookName, handler, {
     name: `reflection-${hookName}`,
@@ -234,6 +239,43 @@ export default function activate(api: PluginAPI): void {
 
     registerMessageHook(
       api,
+      "message_sending",
+      (event: unknown, context?: unknown) => {
+        runHookSafely(logger, "message_sending", () => {
+          logHookPayloadDebug(
+            logger,
+            "message:sending",
+            event,
+            context
+          );
+        });
+      }
+    );
+
+    if (typeof api.on === "function") {
+      api.on("before_message_write", (event: unknown, context?: unknown) => {
+        runHookSafely(logger, "before_message_write", () => {
+          if (bufferManager) {
+            handleBeforeMessageWrite(
+              event,
+              bufferManager,
+              logger,
+              context,
+              memoryGate,
+              fileCurator,
+              config.memoryGate.windowSize
+            );
+          } else {
+            logger.warn("PluginLifecycle", "Callback skipped: buffer manager missing", {
+              hook: "before_message_write",
+            });
+          }
+        });
+      });
+    }
+
+    registerMessageHook(
+      api,
       "message_received",
       (event: unknown, context?: unknown) => {
         runHookSafely(logger, "message_received", () => {
@@ -251,39 +293,6 @@ export default function activate(api: PluginAPI): void {
           } else {
             logger.warn("PluginLifecycle", "Callback skipped: buffer manager missing", {
               hook: "message_received",
-            });
-          }
-        });
-      }
-    );
-
-    registerMessageHook(
-      api,
-      "message_sent",
-      (event: unknown, context?: unknown) => {
-        runHookSafely(logger, "message_sent", () => {
-          logger.debug("PluginLifecycle", "Callback invoked", {
-            hook: "message_sent",
-            hasContext: context !== undefined,
-            hasBufferManager: Boolean(bufferManager),
-          });
-
-          if (bufferManager) {
-            handleMessageSent(
-              event,
-              bufferManager,
-              logger,
-              context,
-              memoryGate,
-              fileCurator,
-              config.memoryGate.windowSize
-            );
-            logger.debug("PluginLifecycle", "Callback dispatched", {
-              hook: "message_sent",
-            });
-          } else {
-            logger.warn("PluginLifecycle", "Callback skipped: buffer manager missing", {
-              hook: "message_sent",
             });
           }
         });
@@ -353,8 +362,8 @@ export { FileCurator } from "./file-curator/index.js";
 export { MemoryGateAnalyzer, MEMORY_GATE_SYSTEM_PROMPT } from "./memory-gate/index.js";
 export { Consolidator, ConsolidationScheduler } from "./consolidation/index.js";
 export {
+  handleBeforeMessageWrite,
   handleMessageReceived,
-  handleMessageSent,
   handleSessionEnd,
 } from "./message-handler.js";
 export type {

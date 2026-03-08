@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 
 import { SessionBufferManager } from '../dist/session-manager.js';
 import {
+  handleBeforeMessageWrite,
   handleMessageReceived,
-  handleMessageSent,
 } from '../dist/message-handler.js';
 
 function createLogger() {
@@ -30,7 +30,7 @@ function flush() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-test('handleMessageSent still runs memory gate when fileCurator is unavailable', async () => {
+test('handleBeforeMessageWrite still runs memory gate when fileCurator is unavailable', async () => {
   const logger = createLogger();
   const bufferManager = new SessionBufferManager(10, logger);
   let analyzeCalls = 0;
@@ -47,16 +47,27 @@ test('handleMessageSent still runs memory gate when fileCurator is unavailable',
   };
 
   handleMessageReceived({
-    sessionKey: 's1',
-    channelId: 'c1',
-    message: { id: 'u1', content: '请直接指出问题' },
-  }, bufferManager, logger);
+    from: 'discord:channel:room-1',
+    content: '请直接指出问题',
+    metadata: {
+      to: 'channel:room-1',
+      messageId: 'u1',
+    },
+  }, bufferManager, logger, {
+    channelId: 'discord',
+    accountId: 'default',
+    conversationId: 'room-1',
+  });
 
-  handleMessageSent({
+  handleBeforeMessageWrite({
+    message: {
+      role: 'assistant',
+      content: [{ type: 'text', text: '后续我会直接指出问题' }],
+    },
+  }, bufferManager, logger, {
     sessionKey: 's1',
-    channelId: 'c1',
-    message: { id: 'a1', content: '后续我会直接指出问题' },
-  }, bufferManager, logger, undefined, memoryGate, undefined, 10);
+    agentId: 'main',
+  }, memoryGate, undefined, 10);
 
   await flush();
 
@@ -67,7 +78,7 @@ test('handleMessageSent still runs memory gate when fileCurator is unavailable',
   );
 });
 
-test('handleMessageSent deduplicates repeated agent messages by message id', async () => {
+test('handleBeforeMessageWrite does not duplicate assistant writes for a single event', async () => {
   const logger = createLogger();
   const bufferManager = new SessionBufferManager(10, logger);
   let analyzeCalls = 0;
@@ -87,26 +98,35 @@ test('handleMessageSent deduplicates repeated agent messages by message id', asy
   };
 
   handleMessageReceived({
-    sessionKey: 's2',
-    channelId: 'c1',
-    message: { id: 'u1', content: 'hello' },
-  }, bufferManager, logger);
+    from: 'discord:channel:room-2',
+    content: 'hello',
+    metadata: {
+      to: 'channel:room-2',
+      messageId: 'u1',
+    },
+  }, bufferManager, logger, {
+    channelId: 'discord',
+    accountId: 'default',
+    conversationId: 'room-2',
+  });
 
-  const event = {
+  handleBeforeMessageWrite({
+    message: {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'world' }],
+    },
+  }, bufferManager, logger, {
     sessionKey: 's2',
-    channelId: 'c1',
-    message: { id: 'a1', content: 'world' },
-  };
-
-  handleMessageSent(event, bufferManager, logger, undefined, memoryGate, fileCurator, 10);
-  handleMessageSent(event, bufferManager, logger, undefined, memoryGate, fileCurator, 10);
+    agentId: 'main',
+  }, memoryGate, fileCurator, 10);
 
   await flush();
 
   assert.equal(analyzeCalls, 1);
+  assert.equal(bufferManager.getMessages('s2').filter((entry) => entry.role === 'agent').length, 1);
 });
 
-test('handleMessageSent serializes gateway and guardian work per session', async () => {
+test('handleBeforeMessageWrite serializes gateway and guardian work per session', async () => {
   const logger = createLogger();
   const bufferManager = new SessionBufferManager(10, logger);
   let activeWrites = 0;
@@ -142,22 +162,37 @@ test('handleMessageSent serializes gateway and guardian work per session', async
   };
 
   handleMessageReceived({
-    sessionKey: 's3',
-    channelId: 'c1',
-    message: { id: 'u1', content: 'hello' },
-  }, bufferManager, logger);
+    from: 'discord:channel:room-3',
+    content: 'hello',
+    metadata: {
+      to: 'channel:room-3',
+      messageId: 'u1',
+    },
+  }, bufferManager, logger, {
+    channelId: 'discord',
+    accountId: 'default',
+    conversationId: 'room-3',
+  });
 
-  handleMessageSent({
+  handleBeforeMessageWrite({
+    message: {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'reply 1' }],
+    },
+  }, bufferManager, logger, {
     sessionKey: 's3',
-    channelId: 'c1',
-    message: { id: 'a1', content: 'reply 1' },
-  }, bufferManager, logger, undefined, memoryGate, fileCurator, 10);
+    agentId: 'main',
+  }, memoryGate, fileCurator, 10);
 
-  handleMessageSent({
+  handleBeforeMessageWrite({
+    message: {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'reply 2' }],
+    },
+  }, bufferManager, logger, {
     sessionKey: 's3',
-    channelId: 'c1',
-    message: { id: 'a2', content: 'reply 2' },
-  }, bufferManager, logger, undefined, memoryGate, fileCurator, 10);
+    agentId: 'main',
+  }, memoryGate, fileCurator, 10);
 
   await flush();
   releaseFirst();
@@ -166,4 +201,124 @@ test('handleMessageSent serializes gateway and guardian work per session', async
 
   assert.equal(sawConcurrentWrite, false);
   assert.equal(writeCount, 2);
+});
+
+test('handleBeforeMessageWrite ignores non-assistant messages', async () => {
+  const logger = createLogger();
+  const bufferManager = new SessionBufferManager(10, logger);
+
+  handleBeforeMessageWrite({
+    message: {
+      role: 'user',
+      content: [{ type: 'text', text: 'hello' }],
+    },
+  }, bufferManager, logger, {
+    sessionKey: 's4',
+    agentId: 'main',
+  });
+
+  await flush();
+
+  assert.equal(bufferManager.getMessages('s4').length, 0);
+});
+
+test('handleMessageReceived and handleBeforeMessageWrite converge on the same channel session key', async () => {
+  const logger = createLogger();
+  const bufferManager = new SessionBufferManager(10, logger);
+
+  handleMessageReceived({
+    from: 'discord:channel:room-5',
+    content: 'hello from user',
+    metadata: {
+      to: 'channel:room-5',
+      messageId: 'u5',
+    },
+  }, bufferManager, logger, {
+    channelId: 'discord',
+    accountId: 'default',
+    conversationId: 'room-5',
+  });
+
+  handleBeforeMessageWrite({
+    message: {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hello from agent' }],
+    },
+  }, bufferManager, logger, {
+    sessionKey: 'agent:main:discord:channel:room-5',
+    agentId: 'main',
+  });
+
+  await flush();
+
+  const canonicalSessionKey = 'channel:discord:channel:room-5';
+  assert.deepEqual(
+    bufferManager.getMessages(canonicalSessionKey).map((entry) => ({
+      role: entry.role,
+      message: entry.message,
+    })),
+    [
+      { role: 'user', message: 'hello from user' },
+      { role: 'agent', message: 'hello from agent' },
+    ]
+  );
+  assert.equal(bufferManager.getMessages('agent:main:discord:channel:room-5').length, 0);
+  assert.equal(bufferManager.getMessages('conv:discord:default:room-5').length, 0);
+});
+
+test('handleMessageReceived logs raw payload and normalized event when debug mode is enabled', () => {
+  process.env.OPENCLAW_REFLECTION_DEBUG_EVENTS = '1';
+
+  try {
+    const logger = createLogger();
+    const bufferManager = new SessionBufferManager(10, logger);
+
+    handleMessageReceived({
+      from: 'discord:channel:room-4',
+      content: 'hello from payload',
+      metadata: {
+        to: 'channel:room-4',
+        provider: 'discord',
+        messageId: 'u4',
+      },
+    }, bufferManager, logger, {
+      channelId: 'discord',
+      accountId: 'acct-1',
+      conversationId: 'conv-1',
+    });
+
+    const debugEntry = logger.entries.find((entry) => entry.event === 'Hook payload debug');
+    assert.ok(debugEntry);
+    assert.deepEqual(debugEntry.details, {
+      hookName: 'message:received',
+      rawEvent: {
+        from: 'discord:channel:room-4',
+        content: 'hello from payload',
+        metadata: {
+          to: 'channel:room-4',
+          provider: 'discord',
+          messageId: 'u4',
+        },
+      },
+      hookContext: {
+        channelId: 'discord',
+        accountId: 'acct-1',
+        conversationId: 'conv-1',
+      },
+      normalizedEvent: {
+        accountId: 'acct-1',
+        conversationId: 'conv-1',
+        from: 'discord:channel:room-4',
+        to: 'channel:room-4',
+        channelId: 'discord',
+        message: {
+          id: 'u4',
+          content: 'hello from payload',
+          channelId: 'discord',
+        },
+      },
+    });
+  } finally {
+    delete process.env.OPENCLAW_REFLECTION_DEBUG_EVENTS;
+  }
 });

@@ -7,6 +7,7 @@ import { ulid } from "ulid";
 const DEFAULT_MEMORY_GATE_WINDOW_SIZE = 10;
 
 interface MessageEvent {
+  role?: string;
   message?: {
     id?: string;
     content?: string;
@@ -23,6 +24,44 @@ interface MessageEvent {
   conversationId?: string;
   accountId?: string;
   channelId?: string;
+}
+
+interface MessageHookContext {
+  channelId?: string;
+  accountId?: string;
+  conversationId?: string;
+}
+
+interface MessageReceivedHookEvent {
+  from?: string;
+  content?: string;
+  timestamp?: number;
+  metadata?: Record<string, unknown>;
+}
+
+interface BeforeMessageWriteEvent {
+  message?: {
+    role?: string;
+    content?: unknown;
+    text?: string;
+    timestamp?: number;
+  };
+  sessionKey?: string;
+}
+
+function isEventDebugEnabled(): boolean {
+  const value = process.env.OPENCLAW_REFLECTION_DEBUG_EVENTS;
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+  return (
+    normalizedValue === "1" ||
+    normalizedValue === "true" ||
+    normalizedValue === "yes" ||
+    normalizedValue === "on"
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -42,17 +81,215 @@ function toRecord(value: unknown): Record<string, unknown> | undefined {
   return isRecord(value) ? value : undefined;
 }
 
-function buildConversationSessionKey(event: MessageEvent): string | null {
-  if (!event.conversationId) {
+function extractTextFromMessageContent(content: unknown): string | undefined {
+  if (typeof content === "string") {
+    return getNonEmptyString(content);
+  }
+
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+
+  const textParts = content
+    .map((entry) => {
+      const record = toRecord(entry);
+      if (record?.type !== "text") {
+        return undefined;
+      }
+
+      return getNonEmptyString(record.text);
+    })
+    .filter((entry): entry is string => entry !== undefined);
+
+  if (textParts.length === 0) {
+    return undefined;
+  }
+
+  return textParts.join("\n");
+}
+
+function deriveChannelIdFromSessionKey(sessionKey: string | undefined): string | undefined {
+  const normalized = getNonEmptyString(sessionKey);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parts = normalized.split(":");
+  if (parts.length >= 3 && parts[0] === "agent") {
+    return getNonEmptyString(parts[2]);
+  }
+
+  return undefined;
+}
+
+function deriveChannelIdFromAddress(address: string | undefined): string | undefined {
+  const normalized = getNonEmptyString(address);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parts = normalized.split(":");
+  if (parts.length >= 2) {
+    return getNonEmptyString(parts[0]);
+  }
+
+  return undefined;
+}
+
+function deriveConversationTargetFromSessionKey(sessionKey: string | undefined): string | undefined {
+  const normalized = getNonEmptyString(sessionKey);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parts = normalized.split(":");
+  if (parts.length >= 5 && parts[0] === "agent") {
+    return getNonEmptyString(parts.slice(3).join(":"));
+  }
+
+  return undefined;
+}
+
+function deriveConversationTargetFromAddress(address: string | undefined): string | undefined {
+  const normalized = getNonEmptyString(address);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parts = normalized.split(":");
+  if (parts.length >= 2) {
+    return getNonEmptyString(parts.slice(1).join(":"));
+  }
+
+  return undefined;
+}
+
+function sanitizeDebugValue(
+  value: unknown,
+  depth = 0
+): unknown {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (depth >= 4) {
+    return "[MaxDepth]";
+  }
+
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 20)
+      .map((item) => sanitizeDebugValue(item, depth + 1))
+      .filter((item) => item !== undefined);
+  }
+
+  if (isRecord(value)) {
+    const sanitizedEntries = Object.entries(value)
+      .slice(0, 40)
+      .map(([key, nestedValue]) => [key, sanitizeDebugValue(nestedValue, depth + 1)] as const)
+      .filter(([, nestedValue]) => nestedValue !== undefined);
+
+    return Object.fromEntries(sanitizedEntries);
+  }
+
+  return String(value);
+}
+
+export function logHookPayloadDebug(
+  logger: Logger,
+  hookName: string,
+  event: unknown,
+  hookContext: unknown,
+  normalizedEvent?: MessageEvent
+): void {
+  if (!isEventDebugEnabled()) {
+    return;
+  }
+
+  const details: Record<string, unknown> = {
+    hookName,
+    rawEvent: sanitizeDebugValue(event),
+    hookContext: sanitizeDebugValue(hookContext),
+  };
+
+  if (normalizedEvent !== undefined) {
+    details.normalizedEvent = sanitizeDebugValue(normalizedEvent);
+  }
+
+  logger.info("MessageHandler", "Hook payload debug", details);
+}
+
+function buildChannelSessionKey(event: MessageEvent): string | null {
+  const channelId =
+    event.channelId ??
+    event.message?.channelId ??
+    deriveChannelIdFromSessionKey(event.sessionKey) ??
+    deriveChannelIdFromAddress(event.from);
+
+  const conversationTarget =
+    event.to ??
+    event.conversationId ??
+    deriveConversationTargetFromAddress(event.from) ??
+    deriveConversationTargetFromSessionKey(event.sessionKey);
+
+  if (!channelId || !conversationTarget) {
     return null;
   }
 
-  const channelId = event.channelId ?? "unknown";
-  const accountId = event.accountId ?? "default";
-  return `conv:${channelId}:${accountId}:${event.conversationId}`;
+  return `channel:${channelId}:${conversationTarget}`;
 }
 
-function normalizeMessageEvent(event: unknown, hookContext?: unknown): MessageEvent {
+function normalizeReceivedEvent(
+  event: unknown,
+  hookContext?: unknown
+): MessageEvent {
+  if (!isRecord(event)) {
+    const contextRecord = toRecord(hookContext) as MessageHookContext | undefined;
+    return {
+      channelId: getNonEmptyString(contextRecord?.channelId),
+      conversationId: getNonEmptyString(contextRecord?.conversationId),
+      accountId: getNonEmptyString(contextRecord?.accountId),
+    };
+  }
+
+  const receivedEvent = event as MessageReceivedHookEvent;
+  const contextRecord = toRecord(hookContext) as MessageHookContext | undefined;
+  const rawMetadata = toRecord(receivedEvent.metadata);
+  const content = getNonEmptyString(receivedEvent.content);
+  const channelId = getNonEmptyString(contextRecord?.channelId);
+  const conversationId = getNonEmptyString(contextRecord?.conversationId);
+  const accountId = getNonEmptyString(contextRecord?.accountId);
+  const from = getNonEmptyString(receivedEvent.from);
+  const to = getNonEmptyString(rawMetadata?.to);
+  const messageId = getNonEmptyString(rawMetadata?.messageId);
+
+  return {
+    conversationId,
+    accountId,
+    from,
+    to,
+    channelId,
+    message:
+      content !== undefined
+        ? {
+            id: messageId,
+            content,
+            channelId,
+          }
+        : undefined,
+  };
+}
+
+function normalizeSentEvent(event: unknown, hookContext?: unknown): MessageEvent {
   if (!isRecord(event)) {
     const contextRecord = toRecord(hookContext);
     return {
@@ -74,7 +311,6 @@ function normalizeMessageEvent(event: unknown, hookContext?: unknown): MessageEv
   const rawSession = toRecord(event.session);
   const rawMetadata = toRecord(event.metadata);
 
-  // Use a field-level fallback chain across all known payload shapes.
   const content =
     getNonEmptyString(rawMessage?.content) ??
     getNonEmptyString(rawMessage?.text) ??
@@ -96,19 +332,6 @@ function normalizeMessageEvent(event: unknown, hookContext?: unknown): MessageEv
     getNonEmptyString(rawContext?.sessionId) ??
     getNonEmptyString(rawSession?.id);
 
-  const channelId =
-    getNonEmptyString(event.channelId) ??
-    getNonEmptyString(rawContext?.channelId) ??
-    getNonEmptyString(rawMetadata?.channelId);
-
-  const conversationId =
-    getNonEmptyString(event.conversationId) ??
-    getNonEmptyString(rawContext?.conversationId);
-
-  const accountId =
-    getNonEmptyString(event.accountId) ??
-    getNonEmptyString(rawContext?.accountId);
-
   const from =
     getNonEmptyString(event.from) ??
     getNonEmptyString(rawMetadata?.from) ??
@@ -118,6 +341,21 @@ function normalizeMessageEvent(event: unknown, hookContext?: unknown): MessageEv
     getNonEmptyString(event.to) ??
     getNonEmptyString(rawMetadata?.to) ??
     getNonEmptyString(rawContext?.to);
+
+  const channelId =
+    getNonEmptyString(event.channelId) ??
+    getNonEmptyString(rawContext?.channelId) ??
+    getNonEmptyString(rawMetadata?.channelId) ??
+    deriveChannelIdFromSessionKey(sessionKey) ??
+    deriveChannelIdFromAddress(from);
+
+  const conversationId =
+    getNonEmptyString(event.conversationId) ??
+    getNonEmptyString(rawContext?.conversationId);
+
+  const accountId =
+    getNonEmptyString(event.accountId) ??
+    getNonEmptyString(rawContext?.accountId);
 
   const success =
     typeof event.success === "boolean"
@@ -137,6 +375,7 @@ function normalizeMessageEvent(event: unknown, hookContext?: unknown): MessageEv
     getNonEmptyString(rawMetadata?.channelId);
 
   return {
+    role: getNonEmptyString(rawMessage?.role),
     sessionKey,
     sessionId,
     conversationId,
@@ -156,13 +395,54 @@ function normalizeMessageEvent(event: unknown, hookContext?: unknown): MessageEv
   };
 }
 
+function normalizeBeforeMessageWriteEvent(
+  event: unknown,
+  hookContext?: unknown
+): MessageEvent {
+  const rawEvent = toRecord(event) as BeforeMessageWriteEvent | undefined;
+  const rawMessage = toRecord(rawEvent?.message);
+  const rawContext = toRecord(hookContext);
+  const role = getNonEmptyString(rawMessage?.role);
+  const sessionKey =
+    getNonEmptyString(rawEvent?.sessionKey) ??
+    getNonEmptyString(rawContext?.sessionKey);
+  const content =
+    extractTextFromMessageContent(rawMessage?.content) ??
+    getNonEmptyString(rawMessage?.text);
+  const channelId =
+    getNonEmptyString(rawContext?.channelId) ??
+    deriveChannelIdFromSessionKey(sessionKey);
+
+  return {
+    role,
+    sessionKey,
+    channelId,
+    message:
+      content !== undefined
+        ? {
+            content,
+            channelId,
+          }
+        : undefined,
+  };
+}
+
 function resolveSessionKey(
   event: MessageEvent,
   logger: Logger,
   hookName: string
 ): string | null {
-  if (event.sessionKey) {
-    return event.sessionKey;
+  const canonicalSessionKey = buildChannelSessionKey(event);
+  if (canonicalSessionKey) {
+    if (event.sessionKey && event.sessionKey !== canonicalSessionKey) {
+      logger.info("MessageHandler", "Canonicalized session key to channel scope", {
+        hookName,
+        originalSessionKey: event.sessionKey,
+        canonicalSessionKey,
+      });
+    }
+
+    return canonicalSessionKey;
   }
 
   if (event.sessionId) {
@@ -173,16 +453,13 @@ function resolveSessionKey(
     return event.sessionId;
   }
 
-  const conversationSessionKey = buildConversationSessionKey(event);
-  if (conversationSessionKey) {
-    logger.info("MessageHandler", "SessionKey missing, fallback to conversationId", {
+  if (event.sessionKey) {
+    logger.warn("MessageHandler", "Using non-canonical session key fallback", {
       hookName,
-      conversationId: event.conversationId,
+      sessionKey: event.sessionKey,
       channelId: event.channelId,
-      accountId: event.accountId,
-      derivedSessionKey: conversationSessionKey,
     });
-    return conversationSessionKey;
+    return event.sessionKey;
   }
 
   logger.warn("MessageHandler", "Skip event without sessionKey", { hookName });
@@ -355,7 +632,14 @@ export function handleMessageReceived(
   logger: Logger,
   hookContext?: unknown
 ): void {
-  const normalizedEvent = normalizeMessageEvent(event, hookContext);
+  const normalizedEvent = normalizeReceivedEvent(event, hookContext);
+  logHookPayloadDebug(
+    logger,
+    "message:received",
+    event,
+    hookContext,
+    normalizedEvent
+  );
   const sessionKey = resolveSessionKey(
     normalizedEvent,
     logger,
@@ -400,17 +684,25 @@ export function handleMessageReceived(
   bufferManager.push(sessionKey, message);
 }
 
-export function handleMessageSent(
+function handleAgentMessage(
   event: unknown,
   bufferManager: SessionBufferManager,
   logger: Logger,
+  hookName: string,
   hookContext?: unknown,
   memoryGate?: MemoryGateAnalyzer,
   fileCurator?: FileCurator,
   memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
 ): void {
-  const normalizedEvent = normalizeMessageEvent(event, hookContext);
-  const sessionKey = resolveSessionKey(normalizedEvent, logger, "message:sent");
+  const normalizedEvent = normalizeSentEvent(event, hookContext);
+  logHookPayloadDebug(
+    logger,
+    hookName,
+    event,
+    hookContext,
+    normalizedEvent
+  );
+  const sessionKey = resolveSessionKey(normalizedEvent, logger, hookName);
 
   if (!sessionKey) {
     return;
@@ -430,7 +722,7 @@ export function handleMessageSent(
       "MessageHandler",
       "Skipped empty agent message",
       {
-        hookName: "message:sent",
+        hookName,
       },
       sessionKey
     );
@@ -441,7 +733,7 @@ export function handleMessageSent(
     "MessageHandler",
     "Buffer message snapshot",
     {
-      hookName: "message:sent",
+      hookName,
       bufferMessage: message,
     },
     sessionKey
@@ -453,7 +745,7 @@ export function handleMessageSent(
       "MessageHandler",
       "Skipped duplicate agent message event",
       {
-        hookName: "message:sent",
+        hookName,
         messageId,
       },
       sessionKey
@@ -481,6 +773,65 @@ export function handleMessageSent(
   }
 }
 
+export function handleMessageSent(
+  event: unknown,
+  bufferManager: SessionBufferManager,
+  logger: Logger,
+  hookContext?: unknown,
+  memoryGate?: MemoryGateAnalyzer,
+  fileCurator?: FileCurator,
+  memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
+): void {
+  handleAgentMessage(
+    event,
+    bufferManager,
+    logger,
+    "message:sent",
+    hookContext,
+    memoryGate,
+    fileCurator,
+    memoryGateWindowSize
+  );
+}
+
+export function handleBeforeMessageWrite(
+  event: unknown,
+  bufferManager: SessionBufferManager,
+  logger: Logger,
+  hookContext?: unknown,
+  memoryGate?: MemoryGateAnalyzer,
+  fileCurator?: FileCurator,
+  memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
+): void {
+  const normalizedEvent = normalizeBeforeMessageWriteEvent(event, hookContext);
+  logHookPayloadDebug(
+    logger,
+    "before_message_write",
+    event,
+    hookContext,
+    normalizedEvent
+  );
+
+  if (normalizedEvent.role !== "assistant") {
+    logger.debug("MessageHandler", "Skipped non-assistant before_message_write event", {
+      hookName: "before_message_write",
+      role: normalizedEvent.role ?? "unknown",
+    });
+    return;
+  }
+
+  handleAgentMessage(
+    normalizedEvent,
+    bufferManager,
+    logger,
+    "before_message_write",
+    hookContext,
+    memoryGate,
+    fileCurator,
+    memoryGateWindowSize
+  );
+}
+
 export function handleSessionEnd(
   event: unknown,
   bufferManager: SessionBufferManager,
@@ -488,7 +839,7 @@ export function handleSessionEnd(
   hookName = "session:end",
   hookContext?: unknown
 ): void {
-  const normalizedEvent = normalizeMessageEvent(event, hookContext);
+  const normalizedEvent = normalizeSentEvent(event, hookContext);
   const sessionKey = resolveSessionKey(normalizedEvent, logger, hookName);
 
   if (!sessionKey) {
