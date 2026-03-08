@@ -114,15 +114,7 @@ Once the gateway restarts, Reflection will begin listening to `message_received`
 
 ## How It Works
 
-```mermaid
-flowchart LR
-  A["Incoming conversation"] --> B["Session buffer"]
-  B --> C["memory_gate"]
-  C -->|durable fact| D["write_guardian"]
-  C -->|thread noise| E["No write"]
-  D --> F["MEMORY.md / USER.md / SOUL.md / IDENTITY.md / TOOLS.md"]
-  F --> G["Scheduled consolidation"]
-```
+![OpenClaw Reflection flowchart](./assets/memory-flowchart.png)
 
 In practice, the pipeline is simple:
 

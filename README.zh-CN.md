@@ -109,15 +109,7 @@ Gateway 重启后，Reflection 就会开始监听 `message_received` 和 `before
 
 ## 它如何工作
 
-```mermaid
-flowchart LR
-  A["Incoming conversation"] --> B["Session buffer"]
-  B --> C["memory_gate"]
-  C -->|durable fact| D["write_guardian"]
-  C -->|thread noise| E["No write"]
-  D --> F["MEMORY.md / USER.md / SOUL.md / IDENTITY.md / TOOLS.md"]
-  F --> G["Scheduled consolidation"]
-```
+![OpenClaw Reflection flowchart](./assets/memory-flowchart.png)
 
 流程很直接：
 

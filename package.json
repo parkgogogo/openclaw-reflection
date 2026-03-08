@@ -5,6 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "files": [
+    "assets/",
     "src/",
     "openclaw.plugin.json",
     "README.md",
