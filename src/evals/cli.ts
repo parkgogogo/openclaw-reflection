@@ -7,6 +7,11 @@ export interface EvalCliOptions {
   sharedDatasetPath?: string;
   memoryGateDatasetPath?: string;
   writeGuardianDatasetPath?: string;
+  modelsConfigPath?: string;
+  models?: string[];
+  baselineModelId?: string;
+  outputPath?: string;
+  markdownOutputPath?: string;
 }
 
 function getArgValue(argv: string[], flag: string): string | undefined {
@@ -34,6 +39,11 @@ function parseSuite(value: string | undefined): EvalSuite {
 }
 
 export function parseEvalCliOptions(argv: string[]): EvalCliOptions {
+  const models = getArgValue(argv, "--models")
+    ?.split(",")
+    .map((modelId) => modelId.trim())
+    .filter((modelId) => modelId !== "");
+
   return {
     suite: parseSuite(getArgValue(argv, "--suite")),
     useJudge: !argv.includes("--no-judge"),
@@ -41,5 +51,10 @@ export function parseEvalCliOptions(argv: string[]): EvalCliOptions {
     sharedDatasetPath: getArgValue(argv, "--shared-dataset"),
     memoryGateDatasetPath: getArgValue(argv, "--memory-gate-dataset"),
     writeGuardianDatasetPath: getArgValue(argv, "--write-guardian-dataset"),
+    modelsConfigPath: getArgValue(argv, "--models-config"),
+    models,
+    baselineModelId: getArgValue(argv, "--baseline"),
+    outputPath: getArgValue(argv, "--output"),
+    markdownOutputPath: getArgValue(argv, "--markdown-output"),
   };
 }

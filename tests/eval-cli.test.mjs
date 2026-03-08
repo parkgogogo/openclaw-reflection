@@ -66,3 +66,40 @@ test("parseEvalCliOptions supports per-file dataset overrides", () => {
   assert.equal(options.memoryGateDatasetPath, "tmp/memory-gate.jsonl");
   assert.equal(options.writeGuardianDatasetPath, "tmp/write-guardian.jsonl");
 });
+
+test("parseEvalCliOptions supports comparison mode flags", () => {
+  const options = parseEvalCliOptions([
+    "node",
+    "evals/run.mjs",
+    "--suite",
+    "memory-gate",
+    "--models-config",
+    "evals/models.json",
+    "--models",
+    "grok-fast,gpt-5",
+    "--baseline",
+    "grok-fast",
+    "--output",
+    "evals/results/matrix.json",
+    "--markdown-output",
+    "evals/results/matrix.md",
+  ]);
+
+  assert.equal(options.suite, "memory-gate");
+  assert.equal(options.modelsConfigPath, "evals/models.json");
+  assert.deepEqual(options.models, ["grok-fast", "gpt-5"]);
+  assert.equal(options.baselineModelId, "grok-fast");
+  assert.equal(options.outputPath, "evals/results/matrix.json");
+  assert.equal(options.markdownOutputPath, "evals/results/matrix.md");
+});
+
+test("parseEvalCliOptions ignores empty model ids in comparison mode", () => {
+  const options = parseEvalCliOptions([
+    "node",
+    "evals/run.mjs",
+    "--models",
+    "grok-fast,,gpt-5,",
+  ]);
+
+  assert.deepEqual(options.models, ["grok-fast", "gpt-5"]);
+});
