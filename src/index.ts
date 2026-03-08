@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as url from "url";
-import { parseConfig } from "./config.js";
+import { createConfigLogSnapshot, parseConfig } from "./config.js";
 import { ConsolidationScheduler } from "./consolidation/index.js";
 import { FileCurator } from "./file-curator/index.js";
 import { LLMService as SharedLLMService } from "./llm/service.js";
@@ -29,6 +29,7 @@ export interface PluginLogger {
 }
 
 export interface PluginAPI {
+  pluginConfig?: unknown;
   config?: {
     get?: (key: string) => unknown;
   };
@@ -70,6 +71,21 @@ function createLLMService(config: PluginConfig): LLMService {
     apiKey,
     model,
   });
+}
+
+function isConfigOnlyModeEnabled(): boolean {
+  const value = process.env.OPENCLAW_REFLECTION_CONFIG_ONLY;
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+  return (
+    normalizedValue === "1" ||
+    normalizedValue === "true" ||
+    normalizedValue === "yes" ||
+    normalizedValue === "on"
+  );
 }
 
 function runHookSafely(
@@ -121,6 +137,8 @@ export default function activate(api: PluginAPI): void {
 
   try {
     const config: PluginConfig = parseConfig(api);
+    const configSnapshot = createConfigLogSnapshot(config);
+    const configOnlyMode = isConfigOnlyModeEnabled();
 
     const __filename = url.fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
@@ -132,17 +150,32 @@ export default function activate(api: PluginAPI): void {
     gatewayLogger.info("[Reflection] Plugin starting...");
     logger.info("PluginLifecycle", "Plugin starting");
 
-    gatewayLogger.info("[Reflection] Configuration loaded", {
-      bufferSize: config.bufferSize,
-      logLevel: config.logLevel,
-    });
-    logger.info("PluginLifecycle", "Configuration loaded", {
-      bufferSize: config.bufferSize,
-      logLevel: config.logLevel,
-    });
+    gatewayLogger.info(
+      "[Reflection] Configuration loaded",
+      configSnapshot as Record<string, unknown>
+    );
+    logger.info(
+      "PluginLifecycle",
+      "Configuration loaded",
+      configSnapshot as Record<string, unknown>
+    );
 
     gatewayLogger.info("[Reflection] File logger initialized");
     logger.info("PluginLifecycle", "File logger initialized");
+
+    if (configOnlyMode) {
+      gatewayLogger.info(
+        "[Reflection] Config-only mode enabled, skipping hooks and side effects",
+        configSnapshot as Record<string, unknown>
+      );
+      logger.info(
+        "PluginLifecycle",
+        "Config-only mode enabled, skipping hooks and side effects",
+        configSnapshot as Record<string, unknown>
+      );
+      isRegistered = true;
+      return;
+    }
 
     bufferManager = new SessionBufferManager(config.bufferSize, logger);
 

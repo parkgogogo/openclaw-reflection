@@ -1,6 +1,7 @@
 import type { LogLevel, PluginConfig } from "./types.js";
 
 interface PluginAPI {
+  pluginConfig?: unknown;
   config?: {
     get?: (key: string) => unknown;
   };
@@ -62,44 +63,139 @@ function getLogLevel(value: unknown): LogLevel {
   return DEFAULT_CONFIG.logLevel;
 }
 
+function readConfigValue(
+  config: PluginAPI["config"],
+  key: string
+): unknown {
+  const directValue = config?.get?.(key);
+  if (directValue !== undefined) {
+    return directValue;
+  }
+
+  const segments = key.split(".");
+  if (segments.length === 1) {
+    return undefined;
+  }
+
+  const [rootKey, ...nestedSegments] = segments;
+  let currentValue = config?.get?.(rootKey);
+
+  for (const segment of nestedSegments) {
+    if (!isRecord(currentValue) || !(segment in currentValue)) {
+      return undefined;
+    }
+
+    currentValue = currentValue[segment];
+  }
+
+  return currentValue;
+}
+
+function readRecordValue(
+  value: unknown,
+  key: string
+): unknown {
+  const segments = key.split(".");
+  let currentValue: unknown = value;
+
+  for (const segment of segments) {
+    if (!isRecord(currentValue) || !(segment in currentValue)) {
+      return undefined;
+    }
+
+    currentValue = currentValue[segment];
+  }
+
+  return currentValue;
+}
+
+function readPluginConfigValue(api: PluginAPI, key: string): unknown {
+  const pluginConfigValue = readRecordValue(api.pluginConfig, key);
+  if (pluginConfigValue !== undefined) {
+    return pluginConfigValue;
+  }
+
+  return readConfigValue(api.config, key);
+}
+
+export type ConfigLogSnapshot = Record<string, unknown> & {
+  bufferSize: number;
+  logLevel: LogLevel;
+  llm: {
+    baseURL: string;
+    apiKeyConfigured: boolean;
+    model: string;
+  };
+  memoryGate: {
+    enabled: boolean;
+    windowSize: number;
+  };
+  consolidation: {
+    enabled: boolean;
+    schedule: string;
+  };
+};
+
+export function createConfigLogSnapshot(
+  config: PluginConfig
+): ConfigLogSnapshot {
+  return {
+    bufferSize: config.bufferSize,
+    logLevel: config.logLevel,
+    llm: {
+      baseURL: config.llm.baseURL,
+      apiKeyConfigured: config.llm.apiKey.trim().length > 0,
+      model: config.llm.model,
+    },
+    memoryGate: {
+      enabled: config.memoryGate.enabled,
+      windowSize: config.memoryGate.windowSize,
+    },
+    consolidation: {
+      enabled: config.consolidation.enabled,
+      schedule: config.consolidation.schedule,
+    },
+  };
+}
+
 export function parseConfig(api: PluginAPI): PluginConfig {
-  const config = api.config ?? {};
-  const llmRaw = config.get?.("llm");
-  const memoryGateRaw = config.get?.("memoryGate");
-  const consolidationRaw = config.get?.("consolidation");
-
-  const llmConfig = isRecord(llmRaw) ? llmRaw : {};
-  const memoryGateConfig = isRecord(memoryGateRaw) ? memoryGateRaw : {};
-  const consolidationConfig = isRecord(consolidationRaw) ? consolidationRaw : {};
-
   return {
     bufferSize: getPositiveInteger(
-      config.get?.("bufferSize"),
+      readPluginConfigValue(api, "bufferSize"),
       DEFAULT_CONFIG.bufferSize
     ),
-    logLevel: getLogLevel(config.get?.("logLevel")),
+    logLevel: getLogLevel(readPluginConfigValue(api, "logLevel")),
     llm: {
-      baseURL: getString(llmConfig.baseURL, DEFAULT_CONFIG.llm.baseURL),
-      apiKey: getString(llmConfig.apiKey, DEFAULT_CONFIG.llm.apiKey),
-      model: getString(llmConfig.model, DEFAULT_CONFIG.llm.model),
+      baseURL: getString(
+        readPluginConfigValue(api, "llm.baseURL"),
+        DEFAULT_CONFIG.llm.baseURL
+      ),
+      apiKey: getString(
+        readPluginConfigValue(api, "llm.apiKey"),
+        DEFAULT_CONFIG.llm.apiKey
+      ),
+      model: getString(
+        readPluginConfigValue(api, "llm.model"),
+        DEFAULT_CONFIG.llm.model
+      ),
     },
     memoryGate: {
       enabled: getBoolean(
-        memoryGateConfig.enabled,
+        readPluginConfigValue(api, "memoryGate.enabled"),
         DEFAULT_CONFIG.memoryGate.enabled
       ),
       windowSize: getPositiveInteger(
-        memoryGateConfig.windowSize,
+        readPluginConfigValue(api, "memoryGate.windowSize"),
         DEFAULT_CONFIG.memoryGate.windowSize
       ),
     },
     consolidation: {
       enabled: getBoolean(
-        consolidationConfig.enabled,
+        readPluginConfigValue(api, "consolidation.enabled"),
         DEFAULT_CONFIG.consolidation.enabled
       ),
       schedule: getString(
-        consolidationConfig.schedule,
+        readPluginConfigValue(api, "consolidation.schedule"),
         DEFAULT_CONFIG.consolidation.schedule
       ),
     },
