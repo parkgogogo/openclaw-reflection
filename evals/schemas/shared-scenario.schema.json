@@ -14,7 +14,7 @@
     },
     "task_type": {
       "type": "string",
-      "enum": ["memory_gate", "writer_guardian"]
+      "enum": ["memory_gate", "write_guardian"]
     },
     "title": {
       "type": "string"

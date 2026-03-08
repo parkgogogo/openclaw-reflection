@@ -1,4 +1,4 @@
-export const MEMORY_GATE_SYSTEM_PROMPT = `You are the assistant's Memory Gate.
+export const MEMORY_GATE_SYSTEM_PROMPT = `You are the assistant's memory_gate.
 
 After each turn, output exactly one decision:
 - NO_WRITE

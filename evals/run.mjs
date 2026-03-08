@@ -10,9 +10,9 @@ import { FileLogger } from "../dist/logger.js";
 import {
   createJudge,
   evaluateMemoryGateBenchmark,
-  evaluateWriterGuardianBenchmark,
+  evaluateWriteGuardianBenchmark,
   runMemoryGateCase,
-  runWriterGuardianCase,
+  runWriteGuardianCase,
 } from "../dist/evals/runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -100,7 +100,7 @@ async function main() {
     datasetRoot,
     sharedDatasetPath,
     memoryGateDatasetPath,
-    writerGuardianDatasetPath,
+    writeGuardianDatasetPath,
   } = parseEvalCliOptions(process.argv);
   const logger = new FileLogger(rootDir, "debug");
   const datasetPaths = resolveEvalDatasetPaths({
@@ -108,7 +108,7 @@ async function main() {
     datasetRoot,
     sharedDatasetPath,
     memoryGateDatasetPath,
-    writerGuardianDatasetPath,
+    writeGuardianDatasetPath,
   });
   const scenarios = readJsonl(datasetPaths.sharedDatasetPath);
   const memoryCases =
@@ -116,8 +116,8 @@ async function main() {
       ? readJsonl(datasetPaths.memoryGateDatasetPath)
       : [];
   const writerCases =
-    suite === "all" || suite === "writer-guardian"
-      ? readJsonl(datasetPaths.writerGuardianDatasetPath)
+    suite === "all" || suite === "write-guardian"
+      ? readJsonl(datasetPaths.writeGuardianDatasetPath)
       : [];
 
   const evalService = createServiceFromEnv("EVAL");
@@ -146,14 +146,14 @@ async function main() {
     failed ||= report.summary.passed !== report.summary.total;
   }
 
-  if (suite === "all" || suite === "writer-guardian") {
-    const report = await evaluateWriterGuardianBenchmark({
+  if (suite === "all" || suite === "write-guardian") {
+    const report = await evaluateWriteGuardianBenchmark({
       scenarios,
       benchmarkCases: writerCases,
-      executeCase: (scenario) => runWriterGuardianCase({ scenario, llmService: evalService, logger }),
+      executeCase: (scenario) => runWriteGuardianCase({ scenario, llmService: evalService, logger }),
       logger,
     });
-    printSummary("writer-guardian", report);
+    printSummary("write-guardian", report);
     failed ||= report.summary.passed !== report.summary.total;
   }
 

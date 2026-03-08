@@ -14,14 +14,14 @@ function readJsonl(relativePath) {
   return content.split("\n").map((line) => JSON.parse(line));
 }
 
-test("writer-guardian versioned datasets live under suite-version directories", () => {
+test("write-guardian versioned datasets live under suite-version directories", () => {
   const expectedPaths = [
-    "evals/datasets/writer-guardian/v1-research/README.md",
-    "evals/datasets/writer-guardian/v1-research/shared/scenarios.jsonl",
-    "evals/datasets/writer-guardian/v1-research/writer-guardian/benchmark.jsonl",
-    "evals/datasets/writer-guardian/v2/README.md",
-    "evals/datasets/writer-guardian/v2/shared/scenarios.jsonl",
-    "evals/datasets/writer-guardian/v2/writer-guardian/benchmark.jsonl",
+    "evals/datasets/write-guardian/v1-research/README.md",
+    "evals/datasets/write-guardian/v1-research/shared/scenarios.jsonl",
+    "evals/datasets/write-guardian/v1-research/write-guardian/benchmark.jsonl",
+    "evals/datasets/write-guardian/v2/README.md",
+    "evals/datasets/write-guardian/v2/shared/scenarios.jsonl",
+    "evals/datasets/write-guardian/v2/write-guardian/benchmark.jsonl",
   ];
 
   for (const relativePath of expectedPaths) {
@@ -33,11 +33,11 @@ test("writer-guardian versioned datasets live under suite-version directories", 
 test("default shared and benchmark datasets include TOOLS.md coverage", () => {
   const sharedScenarios = readJsonl("evals/datasets/shared/scenarios.jsonl");
   const memoryGateCases = readJsonl("evals/datasets/memory-gate/benchmark.jsonl");
-  const writerGuardianCases = readJsonl("evals/datasets/writer-guardian/benchmark.jsonl");
+  const writeGuardianCases = readJsonl("evals/datasets/write-guardian/benchmark.jsonl");
 
   assert.equal(sharedScenarios.length, 32);
   assert.equal(memoryGateCases.length, 18);
-  assert.equal(writerGuardianCases.length, 14);
+  assert.equal(writeGuardianCases.length, 14);
 
   assert.equal(
     sharedScenarios.some((scenario) => scenario.scenario_id === "mg2_tools_alias_mapping"),
@@ -47,7 +47,7 @@ test("default shared and benchmark datasets include TOOLS.md coverage", () => {
   assert.equal(
     sharedScenarios.some((scenario) => scenario.scenario_id === "wg_tools_add_alias_mapping"),
     true,
-    "missing shared writer-guardian TOOLS scenario"
+    "missing shared write-guardian TOOLS scenario"
   );
   assert.equal(
     memoryGateCases.some((scenario) => scenario.scenario_id === "mg2_tools_alias_mapping"),
@@ -55,16 +55,16 @@ test("default shared and benchmark datasets include TOOLS.md coverage", () => {
     "missing memory-gate TOOLS benchmark case"
   );
   assert.equal(
-    writerGuardianCases.some((scenario) => scenario.scenario_id === "wg_tools_add_alias_mapping"),
+    writeGuardianCases.some((scenario) => scenario.scenario_id === "wg_tools_add_alias_mapping"),
     true,
-    "missing writer-guardian TOOLS benchmark case"
+    "missing write-guardian TOOLS benchmark case"
   );
 });
 
-test("writer-guardian v1-research benchmark has 16 cases and matching shared scenarios", () => {
-  const scenarios = readJsonl("evals/datasets/writer-guardian/v1-research/shared/scenarios.jsonl");
+test("write-guardian v1-research benchmark has 16 cases and matching shared scenarios", () => {
+  const scenarios = readJsonl("evals/datasets/write-guardian/v1-research/shared/scenarios.jsonl");
   const benchmarkCases = readJsonl(
-    "evals/datasets/writer-guardian/v1-research/writer-guardian/benchmark.jsonl"
+    "evals/datasets/write-guardian/v1-research/write-guardian/benchmark.jsonl"
   );
 
   const scenarioIds = new Set(scenarios.map((scenario) => scenario.scenario_id));
@@ -79,10 +79,10 @@ test("writer-guardian v1-research benchmark has 16 cases and matching shared sce
   }
 });
 
-test("writer-guardian v2 benchmark has 16 cases and matching shared scenarios", () => {
-  const scenarios = readJsonl("evals/datasets/writer-guardian/v2/shared/scenarios.jsonl");
+test("write-guardian v2 benchmark has 16 cases and matching shared scenarios", () => {
+  const scenarios = readJsonl("evals/datasets/write-guardian/v2/shared/scenarios.jsonl");
   const benchmarkCases = readJsonl(
-    "evals/datasets/writer-guardian/v2/writer-guardian/benchmark.jsonl"
+    "evals/datasets/write-guardian/v2/write-guardian/benchmark.jsonl"
   );
 
   const scenarioIds = new Set(scenarios.map((scenario) => scenario.scenario_id));

@@ -6,12 +6,12 @@ import {
   resolveWorkspaceDir,
 } from "./config.js";
 import { ConsolidationScheduler } from "./consolidation/index.js";
-import { FileCurator } from "./file-curator/index.js";
 import { LLMService as SharedLLMService } from "./llm/service.js";
 import { FileLogger } from "./logger.js";
 import {
   MemoryGateAnalyzer,
 } from "./memory-gate/index.js";
+import { WriteGuardian } from "./write-guardian/index.js";
 import {
   handleBeforeMessageWrite,
   handleMessageReceived,
@@ -205,24 +205,24 @@ export default function activate(api: PluginAPI): void {
         : undefined;
 
     let memoryGate: MemoryGateAnalyzer | undefined;
-    let fileCurator: FileCurator | undefined;
+    let writeGuardian: WriteGuardian | undefined;
 
     if (config.memoryGate.enabled && llmService) {
       memoryGate = new MemoryGateAnalyzer(llmService, logger);
-      logger.info("PluginLifecycle", "MemoryGateAnalyzer initialized", {
+      logger.info("PluginLifecycle", "memory_gate initialized", {
         model: config.llm.model,
       });
     } else {
-      logger.info("PluginLifecycle", "MemoryGateAnalyzer disabled");
+      logger.info("PluginLifecycle", "memory_gate disabled");
     }
 
     if (llmService && workspaceDir) {
-      fileCurator = new FileCurator({ workspaceDir }, logger, llmService);
-      logger.info("PluginLifecycle", "FileCurator initialized", {
+      writeGuardian = new WriteGuardian({ workspaceDir }, logger, llmService);
+      logger.info("PluginLifecycle", "write_guardian initialized", {
         workspaceDir,
       });
     } else if (llmService) {
-      logger.warn("PluginLifecycle", "FileCurator disabled: workspace unavailable", {
+      logger.warn("PluginLifecycle", "write_guardian disabled: workspace unavailable", {
         source: workspaceResolution.source,
         reason: workspaceResolution.reason,
       });
@@ -266,7 +266,7 @@ export default function activate(api: PluginAPI): void {
               logger,
               context,
               memoryGate,
-              fileCurator,
+              writeGuardian,
               config.memoryGate.windowSize
             );
           } else {

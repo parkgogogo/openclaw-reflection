@@ -2,9 +2,9 @@ import os from "node:os";
 import path from "node:path";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 
-import { FileCurator } from "../file-curator/index.js";
 import { LLMService } from "../llm/service.js";
 import { MemoryGateAnalyzer } from "../memory-gate/analyzer.js";
+import { WriteGuardian } from "../write-guardian/index.js";
 import type {
   AgentStep,
   LLMService as LLMServiceContract,
@@ -14,7 +14,7 @@ import type {
 
 export interface SharedScenario {
   scenario_id: string;
-  task_type?: "memory_gate" | "writer_guardian";
+  task_type?: "memory_gate" | "write_guardian";
   title: string;
   recent_messages?: Array<{
     role: "user" | "agent";
@@ -39,7 +39,7 @@ export interface MemoryGateBenchmarkCase {
   tags: string[];
 }
 
-export interface WriterGuardianBenchmarkCase {
+export interface WriteGuardianBenchmarkCase {
   scenario_id: string;
   expected_should_write: boolean;
   expected_outcome_type: string;
@@ -62,7 +62,7 @@ export interface MemoryGateCaseResult {
   error?: string;
 }
 
-export interface WriterGuardianCaseResult {
+export interface WriteGuardianCaseResult {
   scenarioId: string;
   pass: boolean;
   shouldWritePass: boolean;
@@ -156,7 +156,7 @@ export async function evaluateMemoryGateBenchmark(input: {
     }
 
     try {
-      logger.info("EvalRunner", "Starting memory gate case", {
+      logger.info("EvalRunner", "Starting memory_gate case", {
         scenarioId: benchmarkCase.scenario_id,
         expectedDecision: benchmarkCase.expected_decision,
       });
@@ -199,7 +199,7 @@ export async function evaluateMemoryGateBenchmark(input: {
         actualCandidateFact: actual.candidateFact,
         expectedCandidateFact: benchmarkCase.expected_candidate_fact,
       });
-      logger.info("EvalRunner", "Completed memory gate case", {
+      logger.info("EvalRunner", "Completed memory_gate case", {
         scenarioId: benchmarkCase.scenario_id,
         pass,
         decisionPass,
@@ -220,7 +220,7 @@ export async function evaluateMemoryGateBenchmark(input: {
         expectedCandidateFact: benchmarkCase.expected_candidate_fact,
         error: reason,
       });
-      logger.error("EvalRunner", "Memory gate case failed", {
+      logger.error("EvalRunner", "memory_gate case failed", {
         scenarioId: benchmarkCase.scenario_id,
         reason,
       });
@@ -236,18 +236,18 @@ export async function evaluateMemoryGateBenchmark(input: {
   };
 }
 
-export async function evaluateWriterGuardianBenchmark(input: {
+export async function evaluateWriteGuardianBenchmark(input: {
   scenarios: SharedScenario[];
-  benchmarkCases: WriterGuardianBenchmarkCase[];
+  benchmarkCases: WriteGuardianBenchmarkCase[];
   executeCase: (scenario: SharedScenario) => Promise<{
     shouldWrite: boolean;
     toolTrace: string[];
     finalContent: string;
   }>;
   logger?: Logger;
-}): Promise<{ summary: BenchmarkSummary; results: WriterGuardianCaseResult[] }> {
+}): Promise<{ summary: BenchmarkSummary; results: WriteGuardianCaseResult[] }> {
   const scenarioMap = buildScenarioMap(input.scenarios);
-  const results: WriterGuardianCaseResult[] = [];
+  const results: WriteGuardianCaseResult[] = [];
   const logger = input.logger ?? createNoopLogger();
 
   for (const benchmarkCase of input.benchmarkCases) {
@@ -261,7 +261,7 @@ export async function evaluateWriterGuardianBenchmark(input: {
     }
 
     try {
-      logger.info("EvalRunner", "Starting writer guardian case", {
+      logger.info("EvalRunner", "Starting write_guardian case", {
         scenarioId: benchmarkCase.scenario_id,
         targetFile: scenario.target_file,
         expectedShouldWrite: benchmarkCase.expected_should_write,
@@ -293,7 +293,7 @@ export async function evaluateWriterGuardianBenchmark(input: {
         actualToolTrace: actual.toolTrace,
         targetFile: scenario.target_file,
       });
-      logger.info("EvalRunner", "Completed writer guardian case", {
+      logger.info("EvalRunner", "Completed write_guardian case", {
         scenarioId: benchmarkCase.scenario_id,
         pass,
         shouldWritePass,
@@ -315,7 +315,7 @@ export async function evaluateWriterGuardianBenchmark(input: {
         targetFile: scenario.target_file,
         error: reason,
       });
-      logger.error("EvalRunner", "Writer guardian case failed", {
+      logger.error("EvalRunner", "write_guardian case failed", {
         scenarioId: benchmarkCase.scenario_id,
         targetFile: scenario.target_file,
         reason,
@@ -341,7 +341,7 @@ export async function runMemoryGateCase(input: {
     !input.scenario.current_user_message ||
     typeof input.scenario.current_agent_reply !== "string"
   ) {
-    throw new Error(`Memory gate scenario is missing current turn fields: ${input.scenario.scenario_id}`);
+    throw new Error(`memory_gate scenario is missing current turn fields: ${input.scenario.scenario_id}`);
   }
 
   const analyzer = new MemoryGateAnalyzer(
@@ -360,7 +360,7 @@ export async function runMemoryGateCase(input: {
   });
 }
 
-export async function runWriterGuardianCase(input: {
+export async function runWriteGuardianCase(input: {
   scenario: SharedScenario;
   llmService: LLMServiceContract;
   logger?: Logger;
@@ -373,7 +373,7 @@ export async function runWriterGuardianCase(input: {
     !scenario.candidate_fact ||
     typeof scenario.current_file_content !== "string"
   ) {
-    throw new Error(`Writer guardian scenario is missing required fields: ${scenario.scenario_id}`);
+    throw new Error(`write_guardian scenario is missing required fields: ${scenario.scenario_id}`);
   }
 
   const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "reflection-eval-"));
@@ -396,8 +396,8 @@ export async function runWriterGuardianCase(input: {
   };
 
   try {
-    const curator = new FileCurator({ workspaceDir }, logger, recordingService);
-    await curator.write({
+    const writeGuardian = new WriteGuardian({ workspaceDir }, logger, recordingService);
+    await writeGuardian.write({
       decision: scenario.gate_decision,
       reason: scenario.gate_reason,
       candidateFact: scenario.candidate_fact,

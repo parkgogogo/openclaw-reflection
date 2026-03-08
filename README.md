@@ -2,8 +2,8 @@
 
 ![OpenClaw Plugin](https://img.shields.io/badge/OpenClaw-Plugin-111111?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square)
-![memoryGate 18 cases](https://img.shields.io/badge/memoryGate-18%20benchmark%20cases-2ea043?style=flat-square)
-![writer guardian 14 cases](https://img.shields.io/badge/writer%20guardian-14%20benchmark%20cases-2ea043?style=flat-square)
+![memory_gate 18 cases](https://img.shields.io/badge/memory_gate-18%20benchmark%20cases-2ea043?style=flat-square)
+![write_guardian 14 cases](https://img.shields.io/badge/write_guardian-14%20benchmark%20cases-2ea043?style=flat-square)
 
 Chinese version: [README.zh-CN.md](./README.zh-CN.md)
 
@@ -30,23 +30,28 @@ Reflection builds on top of that system instead of replacing it.
 - It does **not** require replacing OpenClaw's default `memory-core`
 - It does **not** take over the active `plugins.slots.memory` role
 - It works by listening to message hooks and curating the same workspace memory files
+- It analyzes and curates `USER.md`, `MEMORY.md`, `TOOLS.md`, `IDENTITY.md`, and `SOUL.md` based on conversation flow
 
 In practice, that means low migration risk and low conceptual overhead: you keep OpenClaw's native MEMORY workflow, and Reflection enhances the capture, filtering, routing, and consolidation steps around it.
 
 ## Why People Install It
 
-Most chat memory systems fail in one of two ways:
+OpenClaw's core long-term files such as `USER.md`, `TOOLS.md`, `IDENTITY.md`, and `SOUL.md` are hard to improve continuously in the default setup.
 
-- they forget too much, so you keep re-explaining the same context
-- they remember too much, so temporary thread noise pollutes long-term memory
-
-Reflection is built to fix both.
+Reflection is built to solve that.
 
 - Keep stable user preferences and collaboration habits
 - Preserve durable shared context across sessions
 - Separate memory into `MEMORY.md`, `USER.md`, `SOUL.md`, `IDENTITY.md`, and `TOOLS.md`
 - Refuse one-off tasks, active thread chatter, and misrouted writes
 - Periodically consolidate memory so it stays usable
+
+## Core Mechanism
+
+Reflection uses LLM analysis over recent conversation context and adds two control points: `memory_gate` and `write_guardian`.
+
+- `memory_gate` analyzes the conversation and decides which durable fact, if any, should be written and which target file it belongs to
+- `write_guardian` acts as the write gate and follows OpenClaw's file responsibilities to decide whether a write should be accepted, rejected, or merged into the target file
 
 ## Install
 
@@ -70,25 +75,25 @@ openclaw plugins install @parkgogogo/openclaw-reflection
 
 Put the following under `plugins.entries.openclaw-reflection` in your OpenClaw config:
 
-```json
+```jsonc
 {
-  "enabled": true,
+  "enabled": true, // Enable the plugin entry
   "config": {
-    "workspaceDir": "/absolute/path/to/your-agent-workspace",
-    "bufferSize": 50,
-    "logLevel": "info",
+    "workspaceDir": "/absolute/path/to/your-agent-workspace", // Workspace where MEMORY.md, USER.md, TOOLS.md, IDENTITY.md, and SOUL.md live
+    "bufferSize": 50, // Session buffer size used to collect recent messages
+    "logLevel": "info", // Runtime log verbosity: debug, info, warn, or error
     "llm": {
-      "baseURL": "https://openrouter.ai/api/v1",
-      "apiKey": "YOUR_API_KEY",
-      "model": "x-ai/grok-4.1-fast"
+      "baseURL": "https://openrouter.ai/api/v1", // OpenAI-compatible provider base URL
+      "apiKey": "YOUR_API_KEY", // Provider API key used for analysis and writing
+      "model": "x-ai/grok-4.1-fast" // Recommended model for plugin runtime
     },
     "memoryGate": {
-      "enabled": true,
-      "windowSize": 10
+      "enabled": true, // Enable durable-memory filtering before any write
+      "windowSize": 10 // Number of recent messages included in memory_gate analysis
     },
     "consolidation": {
-      "enabled": false,
-      "schedule": "0 2 * * *"
+      "enabled": false, // Keep disabled by default; enable only if you want scheduled cleanup
+      "schedule": "0 2 * * *" // Cron expression used when consolidation is enabled
     }
   }
 }
@@ -107,22 +112,13 @@ Once the gateway restarts, Reflection will begin listening to `message_received`
 | Less memory pollution                | Gatekeeping that refuses temporary or misrouted content    |
 | A system that stays usable over time | Optional scheduled consolidation for existing memory files |
 
-## Why This Beats Naive Memory
-
-| Naive memory                     | Reflection                                       |
-| -------------------------------- | ------------------------------------------------ |
-| Appends whatever seems memorable | Filters for durable signal before writing        |
-| Hides memory in a black box      | Stores memory in readable Markdown files         |
-| Mixes all facts together         | Routes facts into purpose-specific files         |
-| Lets bad writes accumulate       | Adds writer guarding and optional scheduled consolidation |
-
 ## How It Works
 
 ```mermaid
 flowchart LR
   A["Incoming conversation"] --> B["Session buffer"]
-  B --> C["memoryGate"]
-  C -->|durable fact| D["Writer guardian"]
+  B --> C["memory_gate"]
+  C -->|durable fact| D["write_guardian"]
   C -->|thread noise| E["No write"]
   D --> F["MEMORY.md / USER.md / SOUL.md / IDENTITY.md / TOOLS.md"]
   F --> G["Scheduled consolidation"]
@@ -131,7 +127,7 @@ flowchart LR
 In practice, the pipeline is simple:
 
 1. Reflection captures conversation context from OpenClaw hooks.
-2. `memoryGate` decides whether the candidate fact is durable enough to keep.
+2. `memory_gate` decides whether the candidate fact is durable enough to keep.
 3. A file-specific guardian either rewrites the target memory file or refuses the write.
 4. When enabled, scheduled consolidation keeps `MEMORY.md`, `USER.md`, `SOUL.md`, and `TOOLS.md` compact over time.
 
@@ -139,13 +135,13 @@ In practice, the pipeline is simple:
 
 The active default offline benchmark currently includes:
 
-- `memoryGate`: `18` benchmark cases
-- `writer guardian`: `14` benchmark cases
+- `memory_gate`: `18` benchmark cases
+- `write_guardian`: `14` benchmark cases
 
 The most recent archived result snapshots in this repo are:
 
-- [`memoryGate`: 16/16 passed on V2](./evals/results/2026-03-08-memory-gate-v2-16-of-16.md)
-- [`writer guardian`: 16/16 passed on V2](./evals/results/2026-03-08-writer-guardian-v2-16-of-16.md)
+- [`memory_gate`: 16/16 passed on V2](./evals/results/2026-03-08-memory-gate-v2-16-of-16.md)
+- [`write_guardian`: 16/16 passed on V2](./evals/results/2026-03-08-write-guardian-v2-16-of-16.md)
 
 These evals focus on the failure modes that make long-term memory systems unreliable:
 
@@ -202,7 +198,7 @@ The development eval setup in this repository currently uses:
 ```bash
 pnpm run typecheck
 pnpm run eval:memory-gate
-pnpm run eval:writer-guardian
+pnpm run eval:write-guardian
 pnpm run eval:all
 ```
 

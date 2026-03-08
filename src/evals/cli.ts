@@ -1,4 +1,4 @@
-export type EvalSuite = "all" | "memory-gate" | "writer-guardian";
+export type EvalSuite = "all" | "memory-gate" | "write-guardian";
 
 export interface EvalCliOptions {
   suite: EvalSuite;
@@ -6,7 +6,7 @@ export interface EvalCliOptions {
   datasetRoot?: string;
   sharedDatasetPath?: string;
   memoryGateDatasetPath?: string;
-  writerGuardianDatasetPath?: string;
+  writeGuardianDatasetPath?: string;
 }
 
 function getArgValue(argv: string[], flag: string): string | undefined {
@@ -23,13 +23,13 @@ function parseSuite(value: string | undefined): EvalSuite {
   if (
     suite === "all" ||
     suite === "memory-gate" ||
-    suite === "writer-guardian"
+    suite === "write-guardian"
   ) {
     return suite;
   }
 
   throw new Error(
-    `Unsupported suite: ${suite}. Expected one of: all, memory-gate, writer-guardian`
+    `Unsupported suite: ${suite}. Expected one of: all, memory-gate, write-guardian`
   );
 }
 
@@ -40,6 +40,6 @@ export function parseEvalCliOptions(argv: string[]): EvalCliOptions {
     datasetRoot: getArgValue(argv, "--dataset-root"),
     sharedDatasetPath: getArgValue(argv, "--shared-dataset"),
     memoryGateDatasetPath: getArgValue(argv, "--memory-gate-dataset"),
-    writerGuardianDatasetPath: getArgValue(argv, "--writer-guardian-dataset"),
+    writeGuardianDatasetPath: getArgValue(argv, "--write-guardian-dataset"),
   };
 }

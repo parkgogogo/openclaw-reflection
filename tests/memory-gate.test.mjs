@@ -47,12 +47,12 @@ test("MemoryGateAnalyzer consumes structured object output from LLMService", asy
   assert.equal(calls.length, 1);
   assert.match(
     calls[0].systemPrompt,
-    /Memory Gate/,
-    "expected analyzer to use the memory gate system prompt"
+    /memory_gate/,
+    "expected analyzer to use the memory_gate system prompt"
   );
 });
 
-test("memory gate system prompt includes explicit routing guidance for USER, MEMORY, SOUL, IDENTITY, and TOOLS", () => {
+test("memory_gate system prompt includes explicit routing guidance for USER, MEMORY, SOUL, IDENTITY, and TOOLS", () => {
   assert.doesNotMatch(MEMORY_GATE_SYSTEM_PROMPT, /Lia/);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /UPDATE_USER[\s\S]*language/i);
   assert.match(MEMORY_GATE_SYSTEM_PROMPT, /UPDATE_SOUL[\s\S]*behavioral principle/i);
@@ -109,7 +109,7 @@ test("MemoryGateAnalyzer accepts UPDATE_TOOLS responses from the LLM", async () 
   });
 });
 
-test("memory gate prompt asks for a canonical concise English candidate fact", () => {
+test("memory_gate prompt asks for a canonical concise English candidate fact", () => {
   const analyzer = new MemoryGateAnalyzer(
     {
       async generateObject() {

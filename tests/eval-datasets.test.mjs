@@ -11,9 +11,9 @@ test("resolveEvalDatasetPaths uses default dataset layout", () => {
   assert.deepEqual(paths, {
     sharedDatasetPath: path.join(rootDir, "evals/datasets/shared/scenarios.jsonl"),
     memoryGateDatasetPath: path.join(rootDir, "evals/datasets/memory-gate/benchmark.jsonl"),
-    writerGuardianDatasetPath: path.join(
+    writeGuardianDatasetPath: path.join(
       rootDir,
-      "evals/datasets/writer-guardian/benchmark.jsonl"
+      "evals/datasets/write-guardian/benchmark.jsonl"
     ),
   });
 });
@@ -31,9 +31,9 @@ test("resolveEvalDatasetPaths supports dataset-root bundles", () => {
       rootDir,
       "evals/datasets/memory-gate/v2/memory-gate/benchmark.jsonl"
     ),
-    writerGuardianDatasetPath: path.join(
+    writeGuardianDatasetPath: path.join(
       rootDir,
-      "evals/datasets/memory-gate/v2/writer-guardian/benchmark.jsonl"
+      "evals/datasets/memory-gate/v2/write-guardian/benchmark.jsonl"
     ),
   });
 });
@@ -50,9 +50,9 @@ test("resolveEvalDatasetPaths lets per-file overrides win", () => {
   assert.deepEqual(paths, {
     sharedDatasetPath: path.join(rootDir, "custom/shared.jsonl"),
     memoryGateDatasetPath: path.join(rootDir, "custom/mg.jsonl"),
-    writerGuardianDatasetPath: path.join(
+    writeGuardianDatasetPath: path.join(
       rootDir,
-      "evals/datasets/memory-gate/v2/writer-guardian/benchmark.jsonl"
+      "evals/datasets/memory-gate/v2/write-guardian/benchmark.jsonl"
     ),
   });
 });

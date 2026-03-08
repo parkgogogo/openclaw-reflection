@@ -1,7 +1,7 @@
 import type { SessionBufferManager } from "./session-manager.js";
 import type { Logger, ReflectionMessage } from "./types.js";
 import { MemoryGateAnalyzer, type MemoryGateOutput } from "./memory-gate/index.js";
-import { FileCurator } from "./file-curator/index.js";
+import { WriteGuardian } from "./write-guardian/index.js";
 import { ulid } from "ulid";
 
 const DEFAULT_MEMORY_GATE_WINDOW_SIZE = 10;
@@ -528,7 +528,7 @@ async function triggerMemoryGate(
   sessionKey: string,
   bufferManager: SessionBufferManager,
   memoryGate: MemoryGateAnalyzer,
-  fileCurator: FileCurator | undefined,
+  writeGuardian: WriteGuardian | undefined,
   logger: Logger,
   memoryGateWindowSize: number
 ): Promise<void> {
@@ -557,22 +557,22 @@ async function triggerMemoryGate(
 
     logger.info(
       "MessageHandler",
-      "Memory gate decision evaluated",
+      "memory_gate decision evaluated",
       {
         decision: output.decision,
         reason: output.reason,
         hasCandidateFact: Boolean(output.candidateFact),
       },
       sessionKey
-    );
+      );
 
     if (isUpdateDecision(output.decision)) {
-      if (fileCurator) {
-        const writeResult = await fileCurator.write(output);
+      if (writeGuardian) {
+        const writeResult = await writeGuardian.write(output);
         if (writeResult.status === "written") {
           logger.info(
             "MessageHandler",
-            "Writer guardian applied update",
+            "write_guardian applied update",
             {
               decision: output.decision,
             },
@@ -581,7 +581,7 @@ async function triggerMemoryGate(
         } else if (writeResult.status === "refused") {
           logger.info(
             "MessageHandler",
-            "Writer guardian refused update",
+            "write_guardian refused update",
             {
               decision: output.decision,
               reason: writeResult.reason,
@@ -591,7 +591,7 @@ async function triggerMemoryGate(
         } else if (writeResult.status === "failed") {
           logger.error(
             "MessageHandler",
-            "Writer guardian failed",
+            "write_guardian failed",
             {
               decision: output.decision,
               reason: writeResult.reason,
@@ -601,7 +601,7 @@ async function triggerMemoryGate(
         } else {
           logger.warn(
             "MessageHandler",
-            "Writer guardian skipped update",
+            "write_guardian skipped update",
             {
               decision: output.decision,
               reason: writeResult.reason,
@@ -612,7 +612,7 @@ async function triggerMemoryGate(
       } else {
         logger.warn(
           "MessageHandler",
-          "UPDATE_* skipped because FileCurator is unavailable",
+          "UPDATE_* skipped because write_guardian is unavailable",
           {
             decision: output.decision,
           },
@@ -624,7 +624,7 @@ async function triggerMemoryGate(
     const reason = error instanceof Error ? error.message : String(error);
     logger.error(
       "MessageHandler",
-      "Memory gate trigger failed",
+      "memory_gate trigger failed",
       { reason },
       sessionKey
     );
@@ -697,7 +697,7 @@ function handleAgentMessage(
   hookName: string,
   hookContext?: unknown,
   memoryGate?: MemoryGateAnalyzer,
-  fileCurator?: FileCurator,
+  writeGuardian?: WriteGuardian,
   memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
 ): void {
   const normalizedEvent = normalizeSentEvent(event, hookContext);
@@ -771,7 +771,7 @@ function handleAgentMessage(
         sessionKey,
         bufferManager,
         memoryGate,
-        fileCurator,
+        writeGuardian,
         logger,
         memoryGateWindowSize
       )
@@ -785,7 +785,7 @@ export function handleMessageSent(
   logger: Logger,
   hookContext?: unknown,
   memoryGate?: MemoryGateAnalyzer,
-  fileCurator?: FileCurator,
+  writeGuardian?: WriteGuardian,
   memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
 ): void {
   handleAgentMessage(
@@ -795,7 +795,7 @@ export function handleMessageSent(
     "message:sent",
     hookContext,
     memoryGate,
-    fileCurator,
+    writeGuardian,
     memoryGateWindowSize
   );
 }
@@ -806,7 +806,7 @@ export function handleBeforeMessageWrite(
   logger: Logger,
   hookContext?: unknown,
   memoryGate?: MemoryGateAnalyzer,
-  fileCurator?: FileCurator,
+  writeGuardian?: WriteGuardian,
   memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
 ): void {
   const normalizedEvent = normalizeBeforeMessageWriteEvent(event, hookContext);
@@ -833,7 +833,7 @@ export function handleBeforeMessageWrite(
     "before_message_write",
     hookContext,
     memoryGate,
-    fileCurator,
+    writeGuardian,
     memoryGateWindowSize
   );
 }

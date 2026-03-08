@@ -65,7 +65,7 @@ export class MemoryGateAnalyzer {
   async analyze(input: MemoryGateInput): Promise<MemoryGateOutput> {
     const prompt = this.buildPrompt(input);
 
-    this.logger.debug("MemoryGateAnalyzer", "Starting memory gate analysis", {
+    this.logger.debug("memory_gate", "Starting memory_gate analysis", {
       recentMessages: input.recentMessages.length,
       hasCurrentUserMessage: input.currentUserMessage.trim() !== "",
       hasCurrentAgentReply: input.currentAgentReply.trim() !== "",
@@ -85,7 +85,7 @@ export class MemoryGateAnalyzer {
       });
     } catch (error) {
       const reason = `LLM request failed: ${getErrorMessage(error)}`;
-      this.logger.error("MemoryGateAnalyzer", "Memory gate LLM request failed", {
+      this.logger.error("memory_gate", "memory_gate LLM request failed", {
         reason,
       });
       return {
@@ -96,7 +96,7 @@ export class MemoryGateAnalyzer {
 
     const output = this.normalizeOutput(response);
 
-    this.logger.info("MemoryGateAnalyzer", "Memory gate decision generated", {
+    this.logger.info("memory_gate", "memory_gate decision generated", {
       decision: output.decision,
       reason: output.reason,
       hasCandidateFact: Boolean(output.candidateFact),
@@ -160,7 +160,7 @@ export class MemoryGateAnalyzer {
     if (!VALID_DECISIONS.has(decision)) {
       return {
         decision: "NO_WRITE",
-        reason: "Invalid decision returned by memory gate",
+        reason: "Invalid decision returned by memory_gate",
       };
     }
 

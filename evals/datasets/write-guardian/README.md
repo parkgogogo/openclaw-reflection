@@ -14,7 +14,7 @@ Versioned datasets:
 Examples:
 
 ```bash
-node evals/run.mjs --suite writer-guardian
-node evals/run.mjs --suite writer-guardian --dataset-root evals/datasets/writer-guardian/v1-research
-node evals/run.mjs --suite writer-guardian --dataset-root evals/datasets/writer-guardian/v2
+node evals/run.mjs --suite write-guardian
+node evals/run.mjs --suite write-guardian --dataset-root evals/datasets/write-guardian/v1-research
+node evals/run.mjs --suite write-guardian --dataset-root evals/datasets/write-guardian/v2
 ```

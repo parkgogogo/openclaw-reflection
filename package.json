@@ -25,7 +25,7 @@
     "typecheck": "tsc --noEmit",
     "e2e:openclaw-plugin": "bash scripts/e2e-openclaw-plugin.sh",
     "eval:memory-gate": "pnpm exec tsc && node evals/run.mjs --suite memory-gate",
-    "eval:writer-guardian": "pnpm exec tsc && node evals/run.mjs --suite writer-guardian",
+    "eval:write-guardian": "pnpm exec tsc && node evals/run.mjs --suite write-guardian",
     "eval:all": "pnpm exec tsc && node evals/run.mjs --suite all"
   },
   "keywords": [

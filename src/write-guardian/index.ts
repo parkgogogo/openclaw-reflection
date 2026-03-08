@@ -16,16 +16,16 @@ type CuratedFilename =
   | "IDENTITY.md"
   | "TOOLS.md";
 
-interface FileCuratorConfig {
+interface WriteGuardianConfig {
   workspaceDir: string;
 }
 
-export interface FileCuratorWriteResult {
+export interface WriteGuardianWriteResult {
   status: "written" | "refused" | "failed" | "skipped";
   reason?: string;
 }
 
-const FILE_CURATOR_SYSTEM_PROMPT = `You are the assistant's Writer Guardian.
+const WRITE_GUARDIAN_SYSTEM_PROMPT = `You are the assistant's write_guardian.
 
 Your job:
 - Decide whether the candidate fact should update the target memory file
@@ -89,25 +89,25 @@ function normalizeFileContent(content: string): string {
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
-export class FileCurator {
-  private config: FileCuratorConfig;
+export class WriteGuardian {
+  private config: WriteGuardianConfig;
   private logger: Logger;
   private llmService: LLMService;
 
-  constructor(config: FileCuratorConfig, logger: Logger, llmService: LLMService) {
+  constructor(config: WriteGuardianConfig, logger: Logger, llmService: LLMService) {
     this.config = config;
     this.logger = logger;
     this.llmService = llmService;
   }
 
-  async write(output: MemoryGateOutput): Promise<FileCuratorWriteResult> {
+  async write(output: MemoryGateOutput): Promise<WriteGuardianWriteResult> {
     if (!isUpdateDecision(output.decision)) {
       return { status: "skipped", reason: "not an update decision" };
     }
 
     const candidateFact = output.candidateFact?.trim();
     if (!candidateFact) {
-      this.logger.warn("FileCurator", "Skip UPDATE_* without candidate fact", {
+      this.logger.warn("WriteGuardian", "Skip UPDATE_* without candidate fact", {
         decision: output.decision,
         reason: output.reason,
       });
@@ -121,9 +121,9 @@ export class FileCurator {
 
     try {
       const result = await this.llmService.runAgent({
-        systemPrompt: FILE_CURATOR_SYSTEM_PROMPT,
+        systemPrompt: WRITE_GUARDIAN_SYSTEM_PROMPT,
         userPrompt: [
-          `Memory Gate decision: ${output.decision}`,
+          `memory_gate decision: ${output.decision}`,
           `Reason from gate: ${output.reason}`,
           `Candidate fact: ${candidateFact}`,
           `Target file: ${targetFile}`,
@@ -135,8 +135,8 @@ export class FileCurator {
       });
 
       if (!result.didWrite) {
-        const reason = result.finalMessage ?? "Writer guardian finished without write";
-        this.logger.info("FileCurator", "Guardian refused update", {
+        const reason = result.finalMessage ?? "write_guardian finished without write";
+        this.logger.info("WriteGuardian", "write_guardian refused update", {
           decision: output.decision,
           filePath,
           reason,
@@ -144,14 +144,14 @@ export class FileCurator {
         return { status: "refused", reason };
       }
 
-      this.logger.info("FileCurator", "Writer guardian rewrote target file", {
+      this.logger.info("WriteGuardian", "write_guardian rewrote target file", {
         decision: output.decision,
         filePath,
       });
       return { status: "written" };
     } catch (error) {
       const reason = getErrorMessage(error);
-      this.logger.error("FileCurator", "Writer guardian execution failed", {
+      this.logger.error("WriteGuardian", "write_guardian execution failed", {
         decision: output.decision,
         filePath,
         reason,

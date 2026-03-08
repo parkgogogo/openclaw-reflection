@@ -6,17 +6,17 @@
 
 - `evals/datasets/shared/scenarios.jsonl`
 - `evals/datasets/memory-gate/benchmark.jsonl`
-- `evals/datasets/writer-guardian/benchmark.jsonl`
+- `evals/datasets/write-guardian/benchmark.jsonl`
 
 当前规模：
 
 - shared scenarios: `32`
 - memory-gate benchmark cases: `18`
-- writer-guardian benchmark cases: `14`
+- write-guardian benchmark cases: `14`
 
 ## Shared Scenarios
 
-### Memory Gate Scenarios
+### memory_gate Scenarios
 
 #### `mg_user_preference_direct_feedback`
 
@@ -57,7 +57,7 @@
 - recent messages:
   - `user`: `这周先把 openclaw-reflection 搞稳定。`
   - `agent`: `好，先围绕 reflection plugin 收口。`
-- current user message: `现在优先都放在 memoryGate 和 writer guardian 上。`
+- current user message: `现在优先都放在 memory_gate 和 write_guardian 上。`
 - current agent reply: `我会把当前重点放在 reflection plugin 的记忆链路。`
 - expected bucket intent: `NO_WRITE`
 - notes: 当前阶段先不把 project focus 写入长期记忆，避免 USER 膨胀；topic/time 收敛后再讨论
@@ -67,8 +67,8 @@
 - title: Architecture decision: two loops
 - recent messages:
   - `user`: `就用两个独立 loop 吧。`
-  - `agent`: `明白，MemoryGate 和 Consolidation 分开。`
-- current user message: `MemoryGate 实时 route，Consolidation 只做低频整理。`
+  - `agent`: `明白，memory_gate 和 Consolidation 分开。`
+- current user message: `memory_gate 实时 route，Consolidation 只做低频整理。`
 - current agent reply: `已按双 loop 架构收口。`
 - expected bucket intent: `NO_WRITE`
 - notes: 当前阶段先不把项目架构事实写入长期记忆，避免 MEMORY 膨胀；topic/time 收敛后再讨论
@@ -88,7 +88,7 @@
 
 - title: Concrete next step to build eval benchmark
 - recent messages:
-  - `user`: `准备开始实际测评实验来测试 memoryGate 和 writer guardian。`
+  - `user`: `准备开始实际测评实验来测试 memory_gate 和 write_guardian。`
   - `agent`: `先设计 benchmark dataset。`
 - current user message: `先设计 dataset，我后面来 review。`
 - current agent reply: `我会先产出 benchmark dataset 草案。`
@@ -201,7 +201,7 @@
 | `wg_user_add_stable_preference`            | Write stable USER preference                  | `UPDATE_USER`     | `USER.md`     | `prefers direct technical feedback`                                                                      | 应写入          |
 | `wg_user_refuse_one_off_emotion`           | Refuse one-off emotion in USER                | `UPDATE_USER`     | `USER.md`     | `feels annoyed today`                                                                                    | 应拒写          |
 | `wg_user_refuse_surveillance_style_detail` | Refuse dossier-like detail in USER            | `UPDATE_USER`     | `USER.md`     | `checked Telegram at 09:13 and 09:47 before replying`                                                    | 应拒写          |
-| `wg_memory_add_architecture_decision`      | Write durable architecture decision to MEMORY | `UPDATE_MEMORY`   | `MEMORY.md`   | `Use two independent loops: MemoryGate for realtime routing and Consolidation for low-frequency cleanup` | 应写入          |
+| `wg_memory_add_architecture_decision`      | Write durable architecture decision to MEMORY | `UPDATE_MEMORY`   | `MEMORY.md`   | `Use two independent loops: memory_gate for realtime routing and Consolidation for low-frequency cleanup` | 应写入          |
 | `wg_memory_refuse_ephemeral_chat_noise`    | Refuse ephemeral chat noise in MEMORY         | `UPDATE_MEMORY`   | `MEMORY.md`   | `user said haha after the explanation`                                                                   | 应拒写          |
 | `wg_memory_refuse_wrong_route_from_gate`   | Refuse wrong route into MEMORY                | `UPDATE_MEMORY`   | `MEMORY.md`   | `prefers responses in Chinese unless English is requested`                                               | 应拒写          |
 | `wg_soul_add_enduring_principle`           | Write enduring SOUL principle                 | `UPDATE_SOUL`     | `SOUL.md`     | `When uncertain about a long-term write, refuse rather than pollute memory`                              | 应写入          |
@@ -213,7 +213,7 @@
 | `wg_tools_add_alias_mapping`               | Write local SSH alias mapping                 | `UPDATE_TOOLS`    | `TOOLS.md`    | `home-server SSH alias refers to devbox.internal`                                                        | 应写入          |
 | `wg_tools_refuse_reusable_procedure`       | Refuse reusable procedure in TOOLS            | `UPDATE_TOOLS`    | `TOOLS.md`    | `Use the browser tool to open the dashboard before every deploy`                                         | 应拒写          |
 
-## Memory Gate Benchmark
+## memory_gate Benchmark
 
 | Scenario ID                                    | Expected Decision | Expected Candidate Fact                                                                                  | Severity   | Tags                                          |
 | ---------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------- |
@@ -285,7 +285,7 @@
   - 长期记忆写入与 project/topic facts 的收敛边界
   - 当前阶段 project facts / active threads / next steps 一律视为 `NO_WRITE`
 
-- `writer-guardian`
+- `write-guardian`
   - 目标文件语义守门
   - 可写 / 拒写
   - 误路由拒写
@@ -299,5 +299,5 @@
 1. `scenario` 本身是否像真实对话，而不是过于教材化
 2. `expected_decision` 是否符合你对 OpenClaw 文件语义的理解
 3. `candidate_fact` 的抽象层是否合适
-4. `writer guardian` 的拒写 case 是否够尖锐
+4. `write_guardian` 的拒写 case 是否够尖锐
 5. 有没有缺失的重要边界样本

@@ -14,7 +14,7 @@ Mode:
 ## Summary
 
 - `memory-gate`: `3/16` passed
-- `writer-guardian`: `11/12` passed
+- `write-guardian`: `11/12` passed
 
 ## Memory Gate Failures
 
@@ -87,7 +87,7 @@ Per-case failures:
 
 ## Interpretation
 
-- current bottleneck is `memory-gate`, not `writer-guardian`
+- current bottleneck is `memory-gate`, not `write-guardian`
 - next optimization should focus on bucket semantics:
   - `USER` vs `MEMORY`
   - `SOUL` vs `MEMORY`

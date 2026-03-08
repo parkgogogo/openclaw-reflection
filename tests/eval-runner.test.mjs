@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   evaluateMemoryGateBenchmark,
-  evaluateWriterGuardianBenchmark,
-  runWriterGuardianCase,
+  evaluateWriteGuardianBenchmark,
+  runWriteGuardianCase,
 } from "../dist/evals/runner.js";
 
 test("evaluateMemoryGateBenchmark supports judge-backed semantic candidate matching", async () => {
@@ -54,7 +54,7 @@ test("evaluateMemoryGateBenchmark supports judge-backed semantic candidate match
   assert.equal(result.results[0].judgeUsed, true);
 });
 
-test("evaluateWriterGuardianBenchmark validates refusal and tool trace", async () => {
+test("evaluateWriteGuardianBenchmark validates refusal and tool trace", async () => {
   const scenarios = [
     {
       scenario_id: "wg_case_1",
@@ -80,7 +80,7 @@ test("evaluateWriterGuardianBenchmark validates refusal and tool trace", async (
     },
   ];
 
-  const result = await evaluateWriterGuardianBenchmark({
+  const result = await evaluateWriteGuardianBenchmark({
     scenarios,
     benchmarkCases,
     executeCase: async () => ({
@@ -158,7 +158,7 @@ test("evaluateMemoryGateBenchmark continues after per-case execution error", asy
   assert.equal(result.results[1].pass, true);
 });
 
-test("evaluateWriterGuardianBenchmark continues after per-case execution error", async () => {
+test("evaluateWriteGuardianBenchmark continues after per-case execution error", async () => {
   const scenarios = [
     {
       scenario_id: "wg_case_error",
@@ -203,7 +203,7 @@ test("evaluateWriterGuardianBenchmark continues after per-case execution error",
     },
   ];
 
-  const result = await evaluateWriterGuardianBenchmark({
+  const result = await evaluateWriteGuardianBenchmark({
     scenarios,
     benchmarkCases,
     executeCase: async (scenario) => {
@@ -226,8 +226,8 @@ test("evaluateWriterGuardianBenchmark continues after per-case execution error",
   assert.equal(result.results[1].pass, true);
 });
 
-test("runWriterGuardianCase supports TOOLS.md scenarios", async () => {
-  const result = await runWriterGuardianCase({
+test("runWriteGuardianCase supports TOOLS.md scenarios", async () => {
+  const result = await runWriteGuardianCase({
     scenario: {
       scenario_id: "wg_tools_case",
       title: "Write local ssh alias",

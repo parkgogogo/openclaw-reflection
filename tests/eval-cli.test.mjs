@@ -58,11 +58,11 @@ test("parseEvalCliOptions supports per-file dataset overrides", () => {
     "tmp/shared.jsonl",
     "--memory-gate-dataset",
     "tmp/memory-gate.jsonl",
-    "--writer-guardian-dataset",
-    "tmp/writer-guardian.jsonl",
+    "--write-guardian-dataset",
+    "tmp/write-guardian.jsonl",
   ]);
 
   assert.equal(options.sharedDatasetPath, "tmp/shared.jsonl");
   assert.equal(options.memoryGateDatasetPath, "tmp/memory-gate.jsonl");
-  assert.equal(options.writerGuardianDatasetPath, "tmp/writer-guardian.jsonl");
+  assert.equal(options.writeGuardianDatasetPath, "tmp/write-guardian.jsonl");
 });

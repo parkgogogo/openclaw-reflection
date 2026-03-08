@@ -5,13 +5,13 @@ export interface ResolveEvalDatasetPathsInput {
   datasetRoot?: string;
   sharedDatasetPath?: string;
   memoryGateDatasetPath?: string;
-  writerGuardianDatasetPath?: string;
+  writeGuardianDatasetPath?: string;
 }
 
 export interface EvalDatasetPaths {
   sharedDatasetPath: string;
   memoryGateDatasetPath: string;
-  writerGuardianDatasetPath: string;
+  writeGuardianDatasetPath: string;
 }
 
 function resolvePath(rootDir: string, targetPath: string): string {
@@ -32,8 +32,8 @@ export function resolveEvalDatasetPaths(
     memoryGateDatasetPath: input.memoryGateDatasetPath
       ? resolvePath(input.rootDir, input.memoryGateDatasetPath)
       : path.join(datasetRoot, "memory-gate/benchmark.jsonl"),
-    writerGuardianDatasetPath: input.writerGuardianDatasetPath
-      ? resolvePath(input.rootDir, input.writerGuardianDatasetPath)
-      : path.join(datasetRoot, "writer-guardian/benchmark.jsonl"),
+    writeGuardianDatasetPath: input.writeGuardianDatasetPath
+      ? resolvePath(input.rootDir, input.writeGuardianDatasetPath)
+      : path.join(datasetRoot, "write-guardian/benchmark.jsonl"),
   };
 }

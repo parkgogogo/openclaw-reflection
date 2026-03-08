@@ -4,12 +4,12 @@
 
 ![OpenClaw Plugin](https://img.shields.io/badge/OpenClaw-Plugin-111111?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square)
-![memoryGate 18 cases](https://img.shields.io/badge/memoryGate-18%20benchmark%20cases-2ea043?style=flat-square)
-![writer guardian 14 cases](https://img.shields.io/badge/writer%20guardian-14%20benchmark%20cases-2ea043?style=flat-square)
+![memory_gate 18 cases](https://img.shields.io/badge/memory_gate-18%20benchmark%20cases-2ea043?style=flat-square)
+![write_guardian 14 cases](https://img.shields.io/badge/write_guardian-14%20benchmark%20cases-2ea043?style=flat-square)
 
 **在不替换 OpenClaw 原生记忆体系的前提下，让 Markdown 记忆更干净、更稳定、更可持续。**
 
-OpenClaw Reflection 是叠加在 OpenClaw 原生 Markdown memory 之上的一层增强插件。它负责监听消息流，过滤线程噪音，把真正长期有效的信息写回 OpenClaw 已经在使用的人类可读 Markdown 文件，并定期整理这些文件，避免长期使用后越记越乱。
+OpenClaw Reflection 是叠加在 OpenClaw 原生 Markdown memory 之上的一层增强插件。它负责监听消息流，过滤线程噪音，把真正长期有效的信息写回 OpenClaw 的核心记忆文件，并定期整理这些文件，避免长期使用后越记越乱。
 
 ## 当前支持范围
 
@@ -30,15 +30,13 @@ Reflection 的定位不是替换，而是增强：
 - 不要求替换 OpenClaw 默认的 `memory-core`
 - 不接管 `plugins.slots.memory`
 - 直接围绕现有 Markdown memory 文件做捕获、过滤、路由和整理
+- 根据对话，分析整理 `USER.md` `MEMORY.md` `TOOLS.md` `IDENTITY.md` `SOUL.md`
 
 这意味着迁移成本低、概念负担低，也更容易人工检查和版本管理。
 
 ## 为什么要装它
 
-聊天类记忆系统通常会在两个方向上失败：
-
-- 记得太少，导致同样的上下文不断重复解释
-- 记得太多，导致短期线程噪音污染长期记忆
+Openclaw 默认状态下核心的 `USER.md` `TOOLS.md` `IDENTITY.md` `SOUL.md` 是很难自我迭代改进的
 
 Reflection 就是为了解决这个问题：
 
@@ -47,6 +45,14 @@ Reflection 就是为了解决这个问题：
 - 将长期记忆拆分到 `MEMORY.md`、`USER.md`、`SOUL.md`、`IDENTITY.md`、`TOOLS.md`
 - 拒绝一次性任务、短期线程聊天、错路由内容
 - 周期性整理长期记忆，防止文件持续膨胀和失真
+
+## 原理
+
+我们使用 LLM 的能力对最近的对话进行分析，设置了 `memory_gate` 和 `write_guardian` 两个工具
+
+- `memory_gate` 通过对话分析，分析有哪些事实应该被记录到哪个文件
+
+- `write_guardian` 设置为写入门禁，会根据 OpenClaw 官方的指引，来判断是否要写入，并进行事实整合
 
 ## 安装
 
@@ -64,25 +70,25 @@ openclaw plugins install @parkgogogo/openclaw-reflection
 
 把下面这段配置写到 OpenClaw profile 的 `plugins.entries.openclaw-reflection` 下：
 
-```json
+```jsonc
 {
-  "enabled": true,
+  "enabled": true, // 启用这个插件入口
   "config": {
-    "workspaceDir": "/absolute/path/to/your-agent-workspace",
-    "bufferSize": 50,
-    "logLevel": "info",
+    "workspaceDir": "/absolute/path/to/your-agent-workspace", // 长期记忆文件所在的 agent workspace 目录
+    "bufferSize": 50, // 会话缓冲区大小，用来保留最近消息上下文
+    "logLevel": "info", // 运行日志级别：debug、info、warn、error
     "llm": {
-      "baseURL": "https://openrouter.ai/api/v1",
-      "apiKey": "YOUR_API_KEY",
-      "model": "x-ai/grok-4.1-fast"
+      "baseURL": "https://openrouter.ai/api/v1", // OpenAI 兼容接口的 provider base URL
+      "apiKey": "YOUR_API_KEY", // 用于分析和写入决策的 provider API key
+      "model": "x-ai/grok-4.1-fast" // 推荐用于插件运行时的模型
     },
     "memoryGate": {
-      "enabled": true,
-      "windowSize": 10
+      "enabled": true, // 启用长期记忆写入前的过滤
+      "windowSize": 10 // memory_gate 分析时使用的最近消息窗口大小
     },
     "consolidation": {
-      "enabled": false,
-      "schedule": "0 2 * * *"
+      "enabled": false, // 默认禁用；只有需要定时整理时再开启
+      "schedule": "0 2 * * *" // 启用 consolidation 后使用的 cron 表达式
     }
   }
 }
@@ -106,8 +112,8 @@ Gateway 重启后，Reflection 就会开始监听 `message_received` 和 `before
 ```mermaid
 flowchart LR
   A["Incoming conversation"] --> B["Session buffer"]
-  B --> C["memoryGate"]
-  C -->|durable fact| D["Writer guardian"]
+  B --> C["memory_gate"]
+  C -->|durable fact| D["write_guardian"]
   C -->|thread noise| E["No write"]
   D --> F["MEMORY.md / USER.md / SOUL.md / IDENTITY.md / TOOLS.md"]
   F --> G["Scheduled consolidation"]
@@ -116,21 +122,23 @@ flowchart LR
 流程很直接：
 
 1. Reflection 从 OpenClaw hook 中捕获会话上下文。
-2. `memoryGate` 判断候选事实是否足够长期、足够稳定。
-3. file-specific `writer guardian` 决定是否写入目标文件，并在需要时重写目标文件内容。
+2. `memory_gate` 判断候选事实是否足够长期、足够稳定。
+3. file-specific `write_guardian` 决定是否写入目标文件，并在需要时重写目标文件内容。
 4. 在启用时，`consolidation` 会定期整理长期文件，控制冗余和过时信息。
 
 ## 评测覆盖
 
+我们设置了一个小型人工校验过的数据集，使用 x-ai/grok-4.1-fast 来优化 prompt，测试完善 `memory_gate` 和 `write_guardian`
+
 当前默认离线 benchmark 包含：
 
-- `memoryGate`：`18` 个 benchmark case
-- `writer guardian`：`14` 个 benchmark case
+- `memory_gate`：`18` 个 benchmark case
+- `write_guardian`：`14` 个 benchmark case
 
 仓库中最近一次归档结果快照是：
 
-- [`memoryGate`: 16/16 passed on V2](./evals/results/2026-03-08-memory-gate-v2-16-of-16.md)
-- [`writer guardian`: 16/16 passed on V2](./evals/results/2026-03-08-writer-guardian-v2-16-of-16.md)
+- [`memory_gate`: 16/16 passed on V2](./evals/results/2026-03-08-memory-gate-v2-16-of-16.md)
+- [`write_guardian`: 16/16 passed on V2](./evals/results/2026-03-08-write-guardian-v2-16-of-16.md)
 
 这些评测重点覆盖：
 
@@ -164,7 +172,7 @@ flowchart LR
 ```bash
 pnpm run typecheck
 pnpm run eval:memory-gate
-pnpm run eval:writer-guardian
+pnpm run eval:write-guardian
 pnpm run eval:all
 ```
 

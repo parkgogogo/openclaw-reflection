@@ -30,7 +30,7 @@ function flush() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-test('handleBeforeMessageWrite still runs memory gate when fileCurator is unavailable', async () => {
+test('handleBeforeMessageWrite still runs memory_gate when writeGuardian is unavailable', async () => {
   const logger = createLogger();
   const bufferManager = new SessionBufferManager(10, logger);
   let analyzeCalls = 0;
@@ -74,7 +74,7 @@ test('handleBeforeMessageWrite still runs memory gate when fileCurator is unavai
   assert.equal(analyzeCalls, 1);
   assert.ok(
     logger.entries.some((entry) => entry.level === 'warn' && entry.event.includes('UPDATE_* skipped')),
-    'expected missing file curator warning after gateway analysis'
+    'expected missing write_guardian warning after gateway analysis'
   );
 });
 
@@ -93,7 +93,7 @@ test('handleBeforeMessageWrite does not duplicate assistant writes for a single 
     },
   };
 
-  const fileCurator = {
+  const writeGuardian = {
     async write() {},
   };
 
@@ -118,7 +118,7 @@ test('handleBeforeMessageWrite does not duplicate assistant writes for a single 
   }, bufferManager, logger, {
     sessionKey: 's2',
     agentId: 'main',
-  }, memoryGate, fileCurator, 10);
+  }, memoryGate, writeGuardian, 10);
 
   await flush();
 
@@ -147,7 +147,7 @@ test('handleBeforeMessageWrite serializes gateway and guardian work per session'
     },
   };
 
-  const fileCurator = {
+  const writeGuardian = {
     async write() {
       writeCount += 1;
       activeWrites += 1;
@@ -182,7 +182,7 @@ test('handleBeforeMessageWrite serializes gateway and guardian work per session'
   }, bufferManager, logger, {
     sessionKey: 's3',
     agentId: 'main',
-  }, memoryGate, fileCurator, 10);
+  }, memoryGate, writeGuardian, 10);
 
   handleBeforeMessageWrite({
     message: {
@@ -192,7 +192,7 @@ test('handleBeforeMessageWrite serializes gateway and guardian work per session'
   }, bufferManager, logger, {
     sessionKey: 's3',
     agentId: 'main',
-  }, memoryGate, fileCurator, 10);
+  }, memoryGate, writeGuardian, 10);
 
   await flush();
   releaseFirst();

@@ -65,7 +65,7 @@ test("LLMService generateObject sends structured output request to OpenAI-compat
   };
 
   const result = await service.generateObject({
-    systemPrompt: "Return structured memory gate decision",
+    systemPrompt: "Return structured memory_gate decision",
     userPrompt: "Current user clarified a stable preference",
     schema,
   });
@@ -112,7 +112,7 @@ test("LLMService generateObject rejects invalid schema output", async () => {
 
   await assert.rejects(
     service.generateObject({
-      systemPrompt: "Return structured memory gate decision",
+      systemPrompt: "Return structured memory_gate decision",
       userPrompt: "Anything",
       schema: {
         type: "object",
@@ -206,7 +206,7 @@ test("LLMService runAgent executes read then write tools", async () => {
   );
 
   const result = await service.runAgent({
-    systemPrompt: "You are a writer guardian",
+    systemPrompt: "You are a write_guardian",
     userPrompt: "Update USER.md if appropriate",
     maxSteps: 5,
     tools: [
@@ -288,7 +288,7 @@ test("LLMService runAgent rejects legacy function_call payload", async () => {
 
   await assert.rejects(
     service.runAgent({
-      systemPrompt: "You are a writer guardian",
+      systemPrompt: "You are a write_guardian",
       userPrompt: "Read USER.md",
       maxSteps: 3,
       tools: [
@@ -333,7 +333,7 @@ test("LLMService runAgent returns didWrite=false when no write tool is called", 
   );
 
   const result = await service.runAgent({
-    systemPrompt: "You are a writer guardian",
+    systemPrompt: "You are a write_guardian",
     userPrompt: "Update SOUL.md if appropriate",
     maxSteps: 3,
     tools: [

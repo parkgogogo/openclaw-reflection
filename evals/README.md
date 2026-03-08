@@ -2,8 +2,8 @@
 
 This directory contains benchmark datasets for offline evaluation of:
 
-- `memoryGate`
-- `writer guardian`
+- `memory_gate`
+- `write_guardian`
 
 These evals are intentionally independent from plugin runtime config.
 
@@ -33,7 +33,7 @@ evals/
   schemas/
     shared-scenario.schema.json
     memory-gate-case.schema.json
-    writer-guardian-case.schema.json
+    write-guardian-case.schema.json
   datasets/
     shared/
       scenarios.jsonl
@@ -51,7 +51,7 @@ evals/
           scenarios.jsonl
         memory-gate/
           benchmark.jsonl
-    writer-guardian/
+    write-guardian/
       benchmark.jsonl
 ```
 
@@ -59,7 +59,7 @@ Default mode still reads:
 
 - `evals/datasets/shared/scenarios.jsonl`
 - `evals/datasets/memory-gate/benchmark.jsonl`
-- `evals/datasets/writer-guardian/benchmark.jsonl`
+- `evals/datasets/write-guardian/benchmark.jsonl`
 
 You can also point the runner at a versioned dataset root:
 
@@ -76,22 +76,22 @@ node evals/run.mjs \
   --memory-gate-dataset evals/datasets/memory-gate/v2/memory-gate/benchmark.jsonl
 ```
 
-For suite-specific runs, only the relevant dataset files are loaded. For example, `--suite memory-gate` does not require a writer-guardian benchmark file.
+For suite-specific runs, only the relevant dataset files are loaded. For example, `--suite memory-gate` does not require a write-guardian benchmark file.
 
 ## Design Principles
 
 - Small and hard: first version targets stable regression coverage, not breadth.
 - Golden labels are human-authored.
-- `memoryGate` and `writer guardian` are evaluated separately.
+- `memory_gate` and `write_guardian` are evaluated separately.
 - Shared scenario IDs keep both datasets aligned without forcing end-to-end evaluation.
 
-## Memory Gate Metrics
+## memory_gate Metrics
 
 - decision accuracy
 - candidate fact exact match
 - candidate fact semantic match
 
-## Writer Guardian Metrics
+## write_guardian Metrics
 
 - should-write accuracy
 - target-file consistency
@@ -103,4 +103,4 @@ For suite-specific runs, only the relevant dataset files are loaded. For example
 ## Notes
 
 - Shared scenarios omit timestamps; eval runners can synthesize ordered timestamps.
-- `writer guardian` benchmark entries include current file content and golden write/refuse expectations.
+- `write_guardian` benchmark entries include current file content and golden write/refuse expectations.
