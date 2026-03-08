@@ -7,6 +7,7 @@ import { parseEvalCliOptions } from "../dist/evals/cli.js";
 import { buildMultiModelComparisonReport } from "../dist/evals/comparison.js";
 import { resolveEvalDatasetPaths } from "../dist/evals/datasets.js";
 import { loadEvalModelProfiles } from "../dist/evals/models.js";
+import { writeComparisonReports } from "../dist/evals/reporting.js";
 import { LLMService } from "../dist/llm/service.js";
 import { FileLogger } from "../dist/logger.js";
 import {
@@ -276,6 +277,8 @@ export async function main(argv = process.argv) {
     modelsConfigPath,
     models,
     baselineModelId,
+    outputPath,
+    markdownOutputPath,
   } = parseEvalCliOptions(argv);
   const logger = new FileLogger(rootDir, "debug");
   const datasetPaths = resolveEvalDatasetPaths({
@@ -332,6 +335,11 @@ export async function main(argv = process.argv) {
           modelLabel: profile.label,
         });
       },
+    });
+    await writeComparisonReports({
+      report: comparisonReport,
+      outputPath,
+      markdownOutputPath,
     });
 
     failed = comparisonReport.models.some(
