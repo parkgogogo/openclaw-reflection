@@ -1,9 +1,22 @@
 {
-  "name": "reflection-plugin",
+  "name": "@parkgogogo/openclaw-reflection",
   "version": "1.0.0",
-  "description": "OpenClaw plugin for capturing and storing conversation messages in a circular buffer",
+  "description": "OpenClaw plugin that enhances native Markdown memory with filtering, curation, and consolidation",
   "type": "module",
   "main": "src/index.ts",
+  "files": [
+    "src/",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parkgogogo/openclaw-reflection.git"
+  },
+  "homepage": "https://github.com/parkgogogo/openclaw-reflection#readme",
+  "bugs": {
+    "url": "https://github.com/parkgogogo/openclaw-reflection/issues"
+  },
   "scripts": {
     "build": "tsc --noEmit",
     "clean": "rm -rf logs",
