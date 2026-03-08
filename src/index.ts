@@ -11,7 +11,6 @@ import {
 import {
   handleBeforeMessageWrite,
   handleMessageReceived,
-  handleSessionEnd,
 } from "./message-handler.js";
 import { SessionBufferManager } from "./session-manager.js";
 import type {
@@ -279,42 +278,6 @@ export default function activate(api: PluginAPI): void {
     gatewayLogger.info("[Reflection] Message hooks registered");
     logger.info("PluginLifecycle", "Message hooks registered");
 
-    api.registerHook(
-      "command:new",
-      (event: unknown, context?: unknown) => {
-        runHookSafely(logger, "command:new", () => {
-          if (bufferManager) {
-            handleSessionEnd(
-              event,
-              bufferManager,
-              logger,
-              "command:new",
-              context
-            );
-          }
-        });
-      },
-      { name: "reflection-command-new" }
-    );
-
-    api.registerHook(
-      "command:reset",
-      (event: unknown, context?: unknown) => {
-        runHookSafely(logger, "command:reset", () => {
-          if (bufferManager) {
-            handleSessionEnd(
-              event,
-              bufferManager,
-              logger,
-              "command:reset",
-              context
-            );
-          }
-        });
-      },
-      { name: "reflection-command-reset" }
-    );
-
     isRegistered = true;
     gatewayLogger.info(
       "[Reflection] Plugin registered successfully, all hooks active"
@@ -341,7 +304,6 @@ export { Consolidator, ConsolidationScheduler } from "./consolidation/index.js";
 export {
   handleBeforeMessageWrite,
   handleMessageReceived,
-  handleSessionEnd,
 } from "./message-handler.js";
 export type {
   ConsolidationResult,

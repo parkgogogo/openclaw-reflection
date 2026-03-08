@@ -37,8 +37,6 @@ test('activate registers message hooks through registerHook when api.on is unava
   const events = registered.map((entry) => entry.event);
   assert.deepEqual(events, [
     'message:received',
-    'command:new',
-    'command:reset',
   ]);
 });
 
@@ -74,6 +72,6 @@ test('activate prefers api.on for before_message_write and message_received', as
   );
   assert.deepEqual(
     registered.map((entry) => entry.event),
-    ['command:new', 'command:reset']
+    []
   );
 });
