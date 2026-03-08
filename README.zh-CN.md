@@ -52,11 +52,9 @@ Reflection 就是为了解决这个问题：
 
 ### 推荐方式：安装打包后的插件
 
-OpenClaw 支持直接从 npm 包或 tgz 安装插件。对 Reflection 来说，这才是正确的分发路径，因为用户不应该为了使用插件而先克隆仓库并安装开发依赖。
-
 更详细的安装指引见 [INSTALL.md](./INSTALL.md)。这个文件现在按“给 OpenClaw 自己执行的安装技能”来写，包含安装前应该向操作者询问哪些配置。
 
-发布后可直接安装：
+手动直接安装：
 
 ```bash
 openclaw plugins install @parkgogogo/openclaw-reflection

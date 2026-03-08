@@ -52,11 +52,9 @@ Reflection is built to fix both.
 
 ### Recommended for users: install the plugin package
 
-OpenClaw can install plugins directly from a package source. That is the right distribution path for Reflection, because users should not need to clone the repository or run `pnpm install` just to use the plugin.
-
 For an install script written for OpenClaw itself to follow, including which config questions to ask first, see [INSTALL.md](./INSTALL.md).
 
-Registry install after publishing:
+Install
 
 ```bash
 openclaw plugins install <npm-spec>
