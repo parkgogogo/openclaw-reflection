@@ -49,7 +49,7 @@ test("parseConfig returns defaults when plugin config is missing", async () => {
       windowSize: 10,
     },
     consolidation: {
-      enabled: true,
+      enabled: false,
       schedule: "0 2 * * *",
     },
   });

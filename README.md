@@ -87,7 +87,7 @@ Put the following under `plugins.entries.openclaw-reflection` in your OpenClaw c
       "windowSize": 10
     },
     "consolidation": {
-      "enabled": true,
+      "enabled": false,
       "schedule": "0 2 * * *"
     }
   }
@@ -105,7 +105,7 @@ Once the gateway restarts, Reflection will begin listening to `message_received`
 | A memory system you can inspect      | Plain Markdown files you can open, edit, diff, and version |
 | Better continuity across sessions    | Durable facts routed into the right long-term file         |
 | Less memory pollution                | Gatekeeping that refuses temporary or misrouted content    |
-| A system that stays usable over time | Scheduled consolidation for existing memory files          |
+| A system that stays usable over time | Optional scheduled consolidation for existing memory files |
 
 ## Why This Beats Naive Memory
 
@@ -114,7 +114,7 @@ Once the gateway restarts, Reflection will begin listening to `message_received`
 | Appends whatever seems memorable | Filters for durable signal before writing        |
 | Hides memory in a black box      | Stores memory in readable Markdown files         |
 | Mixes all facts together         | Routes facts into purpose-specific files         |
-| Lets bad writes accumulate       | Adds writer guarding and scheduled consolidation |
+| Lets bad writes accumulate       | Adds writer guarding and optional scheduled consolidation |
 
 ## How It Works
 
@@ -133,7 +133,7 @@ In practice, the pipeline is simple:
 1. Reflection captures conversation context from OpenClaw hooks.
 2. `memoryGate` decides whether the candidate fact is durable enough to keep.
 3. A file-specific guardian either rewrites the target memory file or refuses the write.
-4. Scheduled consolidation keeps `MEMORY.md`, `USER.md`, `SOUL.md`, and `TOOLS.md` compact over time.
+4. When enabled, scheduled consolidation keeps `MEMORY.md`, `USER.md`, `SOUL.md`, and `TOOLS.md` compact over time.
 
 ## Proof, Not Just Promises
 
@@ -177,7 +177,7 @@ These evals focus on the failure modes that make long-term memory systems unreli
 | `llm.model`              | `gpt-4.1-mini`              | Model used for analysis and consolidation |
 | `memoryGate.enabled`     | `true`                      | Enable long-term memory filtering         |
 | `memoryGate.windowSize`  | `10`                        | Message window used during analysis       |
-| `consolidation.enabled`  | `true`                      | Enable scheduled consolidation            |
+| `consolidation.enabled`  | `false`                     | Enable scheduled consolidation            |
 | `consolidation.schedule` | `0 2 * * *`                 | Cron expression for consolidation         |
 
 ## Built For

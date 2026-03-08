@@ -24,7 +24,7 @@ Use these defaults unless the operator asks for something else:
 - `logLevel`: `info`
 - `memoryGate.enabled`: `true`
 - `memoryGate.windowSize`: `10`
-- `consolidation.enabled`: `true`
+- `consolidation.enabled`: `false`
 - `consolidation.schedule`: `0 2 * * *`
 
 Recommended model:
@@ -69,7 +69,7 @@ Write this under `plugins.entries.openclaw-reflection` in the active OpenClaw pr
       "windowSize": 10
     },
     "consolidation": {
-      "enabled": true,
+      "enabled": false,
       "schedule": "0 2 * * *"
     }
   }

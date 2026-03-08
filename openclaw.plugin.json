@@ -54,7 +54,7 @@
         "properties": {
           "enabled": {
             "type": "boolean",
-            "default": true
+            "default": false
           },
           "schedule": {
             "type": "string",

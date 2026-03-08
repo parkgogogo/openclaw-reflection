@@ -81,7 +81,7 @@ openclaw plugins install @parkgogogo/openclaw-reflection
       "windowSize": 10
     },
     "consolidation": {
-      "enabled": true,
+      "enabled": false,
       "schedule": "0 2 * * *"
     }
   }
@@ -99,7 +99,7 @@ Gateway 重启后，Reflection 就会开始监听 `message_received` 和 `before
 | 可检查、可编辑的记忆系统 | 直接落到 Markdown 文件，能打开、diff、版本管理 |
 | 更稳定的跨会话连续性     | 长期事实会被路由到正确的文件                   |
 | 更少的记忆污染           | 会过滤临时线程内容和错路由写入                 |
-| 长期使用后仍然可维护     | 定期 consolidation，避免文件越来越乱           |
+| 长期使用后仍然可维护     | 可选的定期 consolidation，避免文件越来越乱     |
 
 ## 它如何工作
 
@@ -118,7 +118,7 @@ flowchart LR
 1. Reflection 从 OpenClaw hook 中捕获会话上下文。
 2. `memoryGate` 判断候选事实是否足够长期、足够稳定。
 3. file-specific `writer guardian` 决定是否写入目标文件，并在需要时重写目标文件内容。
-4. `consolidation` 定期整理长期文件，控制冗余和过时信息。
+4. 在启用时，`consolidation` 会定期整理长期文件，控制冗余和过时信息。
 
 ## 评测覆盖
 

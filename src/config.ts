@@ -21,7 +21,7 @@ const DEFAULT_CONFIG: PluginConfig = {
     windowSize: 10,
   },
   consolidation: {
-    enabled: true,
+    enabled: false,
     schedule: "0 2 * * *",
   },
 };
