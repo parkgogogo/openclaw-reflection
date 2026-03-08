@@ -2,10 +2,51 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildSingleModelRunReport,
   evaluateMemoryGateBenchmark,
   evaluateWriteGuardianBenchmark,
   runWriteGuardianCase,
 } from "../dist/evals/runner.js";
+
+test("buildSingleModelRunReport preserves model metadata and benchmark results", () => {
+  const report = buildSingleModelRunReport({
+    modelId: "grok-fast",
+    modelLabel: "Grok Fast",
+    suite: "memory-gate",
+    startedAt: "2026-03-09T10:00:00.000Z",
+    finishedAt: "2026-03-09T10:00:10.000Z",
+    summary: {
+      total: 1,
+      passed: 1,
+      errorCounts: {
+        provider_error: 0,
+        schema_error: 0,
+        execution_error: 0,
+      },
+    },
+    results: [
+      {
+        scenarioId: "mg_case_1",
+        pass: true,
+        decisionPass: true,
+        candidatePass: true,
+        judgeUsed: false,
+        actualDecision: "UPDATE_USER",
+        expectedDecision: "UPDATE_USER",
+        actualCandidateFact: "prefers direct technical feedback",
+        expectedCandidateFact: "prefers direct technical feedback",
+      },
+    ],
+  });
+
+  assert.equal(report.modelId, "grok-fast");
+  assert.equal(report.modelLabel, "Grok Fast");
+  assert.equal(report.suite, "memory-gate");
+  assert.equal(report.startedAt, "2026-03-09T10:00:00.000Z");
+  assert.equal(report.finishedAt, "2026-03-09T10:00:10.000Z");
+  assert.equal(report.summary.passed, 1);
+  assert.equal(report.results.length, 1);
+});
 
 test("evaluateMemoryGateBenchmark supports judge-backed semantic candidate matching", async () => {
   const scenarios = [

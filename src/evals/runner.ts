@@ -5,6 +5,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { LLMService } from "../llm/service.js";
 import { MemoryGateAnalyzer } from "../memory-gate/analyzer.js";
 import { WriteGuardian } from "../write-guardian/index.js";
+import type { EvalSuite } from "./cli.js";
 import type {
   AgentStep,
   LLMService as LLMServiceContract,
@@ -83,6 +84,16 @@ export interface BenchmarkSummary {
     schema_error: number;
     execution_error: number;
   };
+}
+
+export interface SingleModelRunReport {
+  modelId: string;
+  modelLabel: string;
+  suite: EvalSuite;
+  startedAt: string;
+  finishedAt: string;
+  summary: BenchmarkSummary;
+  results: MemoryGateCaseResult[] | WriteGuardianCaseResult[];
 }
 
 export interface Judge {
@@ -168,6 +179,12 @@ function classifyMemoryGateError(
   }
 
   return undefined;
+}
+
+export function buildSingleModelRunReport(
+  input: SingleModelRunReport
+): SingleModelRunReport {
+  return { ...input };
 }
 
 export async function evaluateMemoryGateBenchmark(input: {
