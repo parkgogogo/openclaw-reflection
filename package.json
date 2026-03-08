@@ -1,13 +1,15 @@
 {
   "name": "@parkgogogo/openclaw-reflection",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "OpenClaw plugin that enhances native Markdown memory with filtering, curation, and consolidation",
   "type": "module",
   "main": "src/index.ts",
   "files": [
     "src/",
     "openclaw.plugin.json",
-    "README.md"
+    "README.md",
+    "README.zh-CN.md",
+    "INSTALL.md"
   ],
   "repository": {
     "type": "git",
