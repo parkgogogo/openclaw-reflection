@@ -4,6 +4,10 @@
   "configSchema": {
     "type": "object",
     "properties": {
+      "workspaceDir": {
+        "type": "string",
+        "description": "Directory used for USER.md, MEMORY.md, SOUL.md, and IDENTITY.md writes"
+      },
       "bufferSize": {
         "type": "integer",
         "minimum": 1,

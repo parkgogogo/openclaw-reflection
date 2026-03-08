@@ -1,6 +1,10 @@
 import * as path from "path";
 import * as url from "url";
-import { createConfigLogSnapshot, parseConfig } from "./config.js";
+import {
+  createConfigLogSnapshot,
+  parseConfig,
+  resolveWorkspaceDir,
+} from "./config.js";
 import { ConsolidationScheduler } from "./consolidation/index.js";
 import { FileCurator } from "./file-curator/index.js";
 import { LLMService as SharedLLMService } from "./llm/service.js";
@@ -180,7 +184,21 @@ export default function activate(api: PluginAPI): void {
       bufferSize: config.bufferSize,
     });
 
-    const workspaceDir = process.cwd();
+    const workspaceResolution = resolveWorkspaceDir(api);
+    const workspaceDir = workspaceResolution.workspaceDir;
+
+    if (workspaceDir) {
+      logger.info("PluginLifecycle", "Workspace resolved", {
+        workspaceDir,
+        source: workspaceResolution.source,
+      });
+    } else {
+      logger.error("PluginLifecycle", "Workspace unavailable", {
+        source: workspaceResolution.source,
+        reason: workspaceResolution.reason,
+      });
+    }
+
     const llmService =
       config.memoryGate.enabled || config.consolidation.enabled
         ? createLLMService(config)
@@ -198,14 +216,19 @@ export default function activate(api: PluginAPI): void {
       logger.info("PluginLifecycle", "MemoryGateAnalyzer disabled");
     }
 
-    if (llmService) {
+    if (llmService && workspaceDir) {
       fileCurator = new FileCurator({ workspaceDir }, logger, llmService);
+      logger.info("PluginLifecycle", "FileCurator initialized", {
+        workspaceDir,
+      });
+    } else if (llmService) {
+      logger.warn("PluginLifecycle", "FileCurator disabled: workspace unavailable", {
+        source: workspaceResolution.source,
+        reason: workspaceResolution.reason,
+      });
     }
-    logger.info("PluginLifecycle", "FileCurator initialized", {
-      workspaceDir,
-    });
 
-    if (config.consolidation.enabled && llmService) {
+    if (config.consolidation.enabled && llmService && workspaceDir) {
       const consolidationScheduler = new ConsolidationScheduler(
         {
           workspaceDir,
@@ -224,6 +247,11 @@ export default function activate(api: PluginAPI): void {
           schedule: config.consolidation.schedule,
         }
       );
+    } else if (config.consolidation.enabled && llmService) {
+      logger.warn("PluginLifecycle", "ConsolidationScheduler disabled: workspace unavailable", {
+        source: workspaceResolution.source,
+        reason: workspaceResolution.reason,
+      });
     } else {
       logger.info("PluginLifecycle", "ConsolidationScheduler disabled");
     }

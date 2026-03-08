@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { LogLevel, PluginConfig } from "./types.js";
 
 interface PluginAPI {
@@ -136,6 +137,26 @@ export type ConfigLogSnapshot = Record<string, unknown> & {
   };
 };
 
+export interface WorkspaceResolution {
+  workspaceDir?: string;
+  source: string;
+  reason?: string;
+}
+
+function getNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function isFilesystemRoot(dirPath: string): boolean {
+  const resolved = path.resolve(dirPath);
+  return resolved === path.parse(resolved).root;
+}
+
 export function createConfigLogSnapshot(
   config: PluginConfig
 ): ConfigLogSnapshot {
@@ -155,6 +176,36 @@ export function createConfigLogSnapshot(
       enabled: config.consolidation.enabled,
       schedule: config.consolidation.schedule,
     },
+  };
+}
+
+export function resolveWorkspaceDir(
+  api: PluginAPI,
+  cwd: string = process.cwd()
+): WorkspaceResolution {
+  const configuredWorkspaceDir = getNonEmptyString(
+    readPluginConfigValue(api, "workspaceDir")
+  );
+
+  if (configuredWorkspaceDir) {
+    return {
+      workspaceDir: path.resolve(configuredWorkspaceDir),
+      source: "plugin config workspaceDir",
+    };
+  }
+
+  const normalizedCwd = getNonEmptyString(cwd);
+  if (normalizedCwd && !isFilesystemRoot(normalizedCwd)) {
+    return {
+      workspaceDir: path.resolve(normalizedCwd),
+      source: "process.cwd() fallback",
+    };
+  }
+
+  return {
+    source: "unresolved",
+    reason:
+      'Missing plugin config "workspaceDir" and process.cwd() resolved to the filesystem root',
   };
 }
 

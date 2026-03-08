@@ -200,6 +200,45 @@ test("parseConfig reads dotted-path values when nested objects are not returned"
   });
 });
 
+test("resolveWorkspaceDir prefers plugin config workspaceDir", async () => {
+  const { resolveWorkspaceDir } = await importFresh("dist/config.js");
+
+  const resolution = resolveWorkspaceDir(
+    {
+      pluginConfig: {
+        workspaceDir: "/tmp/openclaw-agent-workspace",
+      },
+    },
+    "/"
+  );
+
+  assert.deepEqual(resolution, {
+    workspaceDir: "/tmp/openclaw-agent-workspace",
+    source: "plugin config workspaceDir",
+  });
+});
+
+test("resolveWorkspaceDir refuses filesystem root fallback when workspace is missing", async () => {
+  const { resolveWorkspaceDir } = await importFresh("dist/config.js");
+
+  const resolution = resolveWorkspaceDir(
+    {
+      config: {
+        get() {
+          return undefined;
+        },
+      },
+    },
+    "/"
+  );
+
+  assert.deepEqual(resolution, {
+    source: "unresolved",
+    reason:
+      'Missing plugin config "workspaceDir" and process.cwd() resolved to the filesystem root',
+  });
+});
+
 test("activate logs a sanitized config snapshot and skips registration in config-only mode", async () => {
   process.env.OPENCLAW_REFLECTION_CONFIG_ONLY = "1";
 
