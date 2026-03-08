@@ -80,14 +80,68 @@ function createServiceFromEnv(prefix) {
 function printSummary(name, report) {
   console.log(`\n[${name}] ${report.summary.passed}/${report.summary.total} passed`);
 
+  const errorCounts = report.summary.errorCounts;
+  if (errorCounts) {
+    const totalErrors =
+      errorCounts.provider_error +
+      errorCounts.schema_error +
+      errorCounts.execution_error;
+    if (totalErrors > 0) {
+      console.log(
+        `[${name}] errors: provider_error=${errorCounts.provider_error} schema_error=${errorCounts.schema_error} execution_error=${errorCounts.execution_error}`
+      );
+    }
+  }
+
   const failures = report.results.filter((result) => !result.pass);
   if (failures.length === 0) {
+    const internalErrors = report.results.filter((result) => result.errorType);
+    if (internalErrors.length > 0) {
+      console.log(`[${name}] internal errors:`);
+      for (const result of internalErrors) {
+        console.log(
+          JSON.stringify(
+            {
+              scenarioId: result.scenarioId,
+              pass: result.pass,
+              actualDecision: result.actualDecision,
+              errorType: result.errorType,
+              error: result.error,
+            },
+            null,
+            2
+          )
+        );
+      }
+    }
     return;
   }
 
   console.log(`[${name}] failures:`);
   for (const failure of failures) {
     console.log(JSON.stringify(failure, null, 2));
+  }
+
+  const internalErrorPasses = report.results.filter(
+    (result) => result.errorType && result.pass
+  );
+  if (internalErrorPasses.length > 0) {
+    console.log(`[${name}] internal errors in passed cases:`);
+    for (const result of internalErrorPasses) {
+      console.log(
+        JSON.stringify(
+          {
+            scenarioId: result.scenarioId,
+            pass: result.pass,
+            actualDecision: result.actualDecision,
+            errorType: result.errorType,
+            error: result.error,
+          },
+          null,
+          2
+        )
+      );
+    }
   }
 }
 

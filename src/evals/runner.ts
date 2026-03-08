@@ -59,6 +59,7 @@ export interface MemoryGateCaseResult {
   expectedDecision: MemoryGateOutput["decision"];
   actualCandidateFact?: string;
   expectedCandidateFact?: string;
+  errorType?: "provider_error" | "schema_error" | "execution_error";
   error?: string;
 }
 
@@ -77,6 +78,11 @@ export interface WriteGuardianCaseResult {
 export interface BenchmarkSummary {
   total: number;
   passed: number;
+  errorCounts?: {
+    provider_error: number;
+    schema_error: number;
+    execution_error: number;
+  };
 }
 
 export interface Judge {
@@ -138,6 +144,32 @@ function normalizeFileContent(content: string): string {
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
+function createEmptyErrorCounts(): NonNullable<BenchmarkSummary["errorCounts"]> {
+  return {
+    provider_error: 0,
+    schema_error: 0,
+    execution_error: 0,
+  };
+}
+
+function classifyMemoryGateError(
+  message: string | undefined
+): MemoryGateCaseResult["errorType"] | undefined {
+  if (!message) {
+    return undefined;
+  }
+
+  if (message.includes("Provider request failed")) {
+    return "provider_error";
+  }
+
+  if (message.includes("Schema validation failed")) {
+    return "schema_error";
+  }
+
+  return undefined;
+}
+
 export async function evaluateMemoryGateBenchmark(input: {
   scenarios: SharedScenario[];
   benchmarkCases: MemoryGateBenchmarkCase[];
@@ -148,6 +180,7 @@ export async function evaluateMemoryGateBenchmark(input: {
   const scenarioMap = buildScenarioMap(input.scenarios);
   const results: MemoryGateCaseResult[] = [];
   const logger = input.logger ?? createNoopLogger();
+  const errorCounts = createEmptyErrorCounts();
 
   for (const benchmarkCase of input.benchmarkCases) {
     const scenario = scenarioMap.get(benchmarkCase.scenario_id);
@@ -188,6 +221,10 @@ export async function evaluateMemoryGateBenchmark(input: {
       }
 
       const pass = decisionPass && candidatePass;
+      const errorType = classifyMemoryGateError(actual.reason);
+      if (errorType) {
+        errorCounts[errorType] += 1;
+      }
       results.push({
         scenarioId: benchmarkCase.scenario_id,
         pass,
@@ -198,6 +235,8 @@ export async function evaluateMemoryGateBenchmark(input: {
         expectedDecision: benchmarkCase.expected_decision,
         actualCandidateFact: actual.candidateFact,
         expectedCandidateFact: benchmarkCase.expected_candidate_fact,
+        errorType,
+        error: errorType ? actual.reason : undefined,
       });
       logger.info("EvalRunner", "Completed memory_gate case", {
         scenarioId: benchmarkCase.scenario_id,
@@ -206,9 +245,12 @@ export async function evaluateMemoryGateBenchmark(input: {
         candidatePass,
         judgeUsed,
         actualDecision: actual.decision,
+        errorType,
       });
     } catch (error) {
       const reason = getErrorMessage(error);
+      const errorType = classifyMemoryGateError(reason) ?? "execution_error";
+      errorCounts[errorType] += 1;
       results.push({
         scenarioId: benchmarkCase.scenario_id,
         pass: false,
@@ -218,11 +260,13 @@ export async function evaluateMemoryGateBenchmark(input: {
         actualDecision: "NO_WRITE",
         expectedDecision: benchmarkCase.expected_decision,
         expectedCandidateFact: benchmarkCase.expected_candidate_fact,
+        errorType,
         error: reason,
       });
       logger.error("EvalRunner", "memory_gate case failed", {
         scenarioId: benchmarkCase.scenario_id,
         reason,
+        errorType,
       });
     }
   }
@@ -231,6 +275,7 @@ export async function evaluateMemoryGateBenchmark(input: {
     summary: {
       total: results.length,
       passed: results.filter((result) => result.pass).length,
+      errorCounts,
     },
     results,
   };
