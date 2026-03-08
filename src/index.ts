@@ -293,25 +293,3 @@ export default function activate(api: PluginAPI): void {
     throw error;
   }
 }
-
-export { parseConfig } from "./config.js";
-export { FileLogger } from "./logger.js";
-export { SessionBufferManager } from "./session-manager.js";
-export { LLMService } from "./llm/service.js";
-export { FileCurator } from "./file-curator/index.js";
-export { MemoryGateAnalyzer, MEMORY_GATE_SYSTEM_PROMPT } from "./memory-gate/index.js";
-export { Consolidator, ConsolidationScheduler } from "./consolidation/index.js";
-export {
-  handleBeforeMessageWrite,
-  handleMessageReceived,
-} from "./message-handler.js";
-export type {
-  ConsolidationResult,
-  LLMService as LLMServiceContract,
-  MemoryGateInput,
-  MemoryGateOutput,
-  PluginConfig,
-  ReflectionMessage,
-  Logger,
-  LogLevel,
-} from "./types.js";
