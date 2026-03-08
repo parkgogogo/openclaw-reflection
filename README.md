@@ -1,6 +1,10 @@
 # OpenClaw Reflection
 
-![OpenClaw Reflection logo](./assets/openclaw-reflection-logo.png)
+<p align="center">
+  <img src="./assets/openclaw-reflection-logo.png" alt="OpenClaw Reflection logo" width="180" />
+</p>
+
+<p align="center"><strong>Make OpenClaw's native memory system sharper without replacing it.</strong></p>
 
 ![OpenClaw Plugin](https://img.shields.io/badge/OpenClaw-Plugin-111111?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square)
@@ -8,8 +12,6 @@
 ![write_guardian 14 cases](https://img.shields.io/badge/write_guardian-14%20benchmark%20cases-2ea043?style=flat-square)
 
 Chinese version: [README.zh-CN.md](./README.zh-CN.md)
-
-**Make OpenClaw's native memory system sharper without replacing it.**
 
 OpenClaw Reflection is an additive layer on top of OpenClaw's built-in Markdown memory system. It captures message flow, keeps thread noise out of long-term memory, writes durable knowledge into the same human-readable memory files OpenClaw already uses, and periodically consolidates them so your agent gets sharper over time instead of messier.
 

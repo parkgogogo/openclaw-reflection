@@ -1,6 +1,10 @@
 # OpenClaw Reflection
 
-![OpenClaw Reflection logo](./assets/openclaw-reflection-logo.png)
+<p align="center">
+  <img src="./assets/openclaw-reflection-logo.png" alt="OpenClaw Reflection logo" width="180" />
+</p>
+
+<p align="center"><strong>在不替换 OpenClaw 原生记忆体系的前提下，让 Markdown 记忆更干净、更稳定、更可持续。</strong></p>
 
 英文版： [README.md](./README.md)
 
@@ -8,8 +12,6 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square)
 ![memory_gate 18 cases](https://img.shields.io/badge/memory_gate-18%20benchmark%20cases-2ea043?style=flat-square)
 ![write_guardian 14 cases](https://img.shields.io/badge/write_guardian-14%20benchmark%20cases-2ea043?style=flat-square)
-
-**在不替换 OpenClaw 原生记忆体系的前提下，让 Markdown 记忆更干净、更稳定、更可持续。**
 
 OpenClaw Reflection 是叠加在 OpenClaw 原生 Markdown memory 之上的一层增强插件。它负责监听消息流，过滤线程噪音，把真正长期有效的信息写回 OpenClaw 的核心记忆文件，并定期整理这些文件，避免长期使用后越记越乱。
 
