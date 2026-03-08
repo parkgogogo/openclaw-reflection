@@ -36,14 +36,13 @@ test('activate registers message hooks through registerHook when api.on is unava
 
   const events = registered.map((entry) => entry.event);
   assert.deepEqual(events, [
-    'message:sending',
     'message:received',
     'command:new',
     'command:reset',
   ]);
 });
 
-test('activate prefers api.on for before_message_write/message_received and keeps legacy sending hook', async () => {
+test('activate prefers api.on for before_message_write and message_received', async () => {
   const indexUrl = pathToFileURL(path.join(process.cwd(), 'dist/index.js')).href;
   const mod = await import(`${indexUrl}?t=${Date.now()}-legacy`);
   const activate = mod.default;
@@ -75,6 +74,6 @@ test('activate prefers api.on for before_message_write/message_received and keep
   );
   assert.deepEqual(
     registered.map((entry) => entry.event),
-    ['message:sending', 'command:new', 'command:reset']
+    ['command:new', 'command:reset']
   );
 });

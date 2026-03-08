@@ -11,7 +11,6 @@ import {
 import {
   handleBeforeMessageWrite,
   handleMessageReceived,
-  logHookPayloadDebug,
   handleSessionEnd,
 } from "./message-handler.js";
 import { SessionBufferManager } from "./session-manager.js";
@@ -106,22 +105,15 @@ function runHookSafely(
 
 function registerMessageHook(
   api: PluginAPI,
-  hookName: "message_received" | "message_sending",
+  hookName: "message_received",
   handler: (event: unknown, context?: unknown) => unknown
 ): void {
-  const shouldUseLegacyHookName = hookName === "message_sending";
-
-  if (!shouldUseLegacyHookName && typeof api.on === "function") {
+  if (typeof api.on === "function") {
     api.on(hookName, handler);
     return;
   }
 
-  const fallbackHookName =
-    hookName === "message_received"
-      ? "message:received"
-      : "message:sending";
-
-  api.registerHook(fallbackHookName, handler, {
+  api.registerHook("message:received", handler, {
     name: `reflection-${hookName}`,
   });
 }
@@ -236,21 +228,6 @@ export default function activate(api: PluginAPI): void {
     } else {
       logger.info("PluginLifecycle", "ConsolidationScheduler disabled");
     }
-
-    registerMessageHook(
-      api,
-      "message_sending",
-      (event: unknown, context?: unknown) => {
-        runHookSafely(logger, "message_sending", () => {
-          logHookPayloadDebug(
-            logger,
-            "message:sending",
-            event,
-            context
-          );
-        });
-      }
-    );
 
     if (typeof api.on === "function") {
       api.on("before_message_write", (event: unknown, context?: unknown) => {
