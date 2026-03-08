@@ -35,7 +35,6 @@ Recommended model:
 
 - Use the packaged plugin from npm, not a linked checkout
 - Configure the plugin under `openclaw-reflection`
-- Never use the old id `reflection-plugin`
 - Do not leave `llm.baseURL`, `llm.apiKey`, or `llm.model` empty
 - Only add `openclaw-reflection` to `plugins.allow` if the profile already uses an allowlist
 
@@ -47,12 +46,6 @@ Run:
 
 ```bash
 openclaw plugins install @parkgogogo/openclaw-reflection@0.1.0
-```
-
-If the operator explicitly provides a local release tarball instead, use:
-
-```bash
-openclaw plugins install ./parkgogogo-openclaw-reflection-0.1.0.tgz
 ```
 
 ### 2. Write The Plugin Config
@@ -104,29 +97,5 @@ Do not continue if validation fails.
 Run:
 
 ```bash
-openclaw gateway run --force --verbose
+openclaw gateway restart
 ```
-
-### 5. Verify Success
-
-In another shell, verify the gateway probe:
-
-```bash
-curl --fail http://127.0.0.1:PORT/health
-```
-
-Success requires all of the following:
-
-- The gateway starts without plugin registration errors
-- The plugin log contains `Plugin registered successfully, all hooks active`
-- `GET /health` returns JSON containing `"ok": true`
-
-## Failure Handling
-
-If installation or startup fails:
-
-1. Check that the plugin id is `openclaw-reflection`
-2. Check that `llm.baseURL`, `llm.apiKey`, and `llm.model` are non-empty
-3. Check that `plugins.allow` is not blocking the plugin
-4. Re-run `openclaw config validate --json`
-5. Re-read the plugin log and gateway log before retrying
