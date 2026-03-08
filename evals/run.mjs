@@ -4,10 +4,13 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { parseEvalCliOptions } from "../dist/evals/cli.js";
+import { buildMultiModelComparisonReport } from "../dist/evals/comparison.js";
 import { resolveEvalDatasetPaths } from "../dist/evals/datasets.js";
+import { loadEvalModelProfiles } from "../dist/evals/models.js";
 import { LLMService } from "../dist/llm/service.js";
 import { FileLogger } from "../dist/logger.js";
 import {
+  buildSingleModelRunReport,
   createJudge,
   evaluateMemoryGateBenchmark,
   evaluateWriteGuardianBenchmark,
@@ -75,6 +78,33 @@ function createServiceFromEnv(prefix) {
     apiKey,
     model,
   });
+}
+
+function createServiceFromProfile(profile) {
+  return new LLMService({
+    baseURL: profile.baseURL,
+    apiKey: profile.apiKey,
+    model: profile.model,
+  });
+}
+
+function createEmptyErrorCounts() {
+  return {
+    provider_error: 0,
+    schema_error: 0,
+    execution_error: 0,
+  };
+}
+
+function mergeErrorCounts(left, right) {
+  if (!right) {
+    return left;
+  }
+
+  left.provider_error += right.provider_error;
+  left.schema_error += right.schema_error;
+  left.execution_error += right.execution_error;
+  return left;
 }
 
 function printSummary(name, report) {
@@ -145,7 +175,95 @@ function printSummary(name, report) {
   }
 }
 
-async function main() {
+async function runSingleModelSuite(input) {
+  const {
+    suite,
+    scenarios,
+    memoryCases,
+    writerCases,
+    evalService,
+    judgeService,
+    useJudge,
+    logger,
+    modelId,
+    modelLabel,
+  } = input;
+
+  const startedAt = new Date().toISOString();
+  const combinedResults = [];
+  let total = 0;
+  let passed = 0;
+  let errorCounts;
+
+  if (suite === "all" || suite === "memory-gate") {
+    const report = await evaluateMemoryGateBenchmark({
+      scenarios,
+      benchmarkCases: memoryCases,
+      executeCase: (scenario) =>
+        runMemoryGateCase({ scenario, llmService: evalService, logger }),
+      judge: useJudge ? createJudge(judgeService) : undefined,
+      logger,
+    });
+    printSummary(
+      suite === "all" ? `${modelId}/memory-gate` : modelId,
+      report
+    );
+    total += report.summary.total;
+    passed += report.summary.passed;
+    errorCounts = mergeErrorCounts(
+      errorCounts ?? createEmptyErrorCounts(),
+      report.summary.errorCounts
+    );
+    combinedResults.push(...report.results);
+  }
+
+  if (suite === "all" || suite === "write-guardian") {
+    const report = await evaluateWriteGuardianBenchmark({
+      scenarios,
+      benchmarkCases: writerCases,
+      executeCase: (scenario) =>
+        runWriteGuardianCase({ scenario, llmService: evalService, logger }),
+      logger,
+    });
+    printSummary(
+      suite === "all" ? `${modelId}/write-guardian` : modelId,
+      report
+    );
+    total += report.summary.total;
+    passed += report.summary.passed;
+    combinedResults.push(...report.results);
+  }
+
+  return buildSingleModelRunReport({
+    modelId,
+    modelLabel,
+    suite,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    summary: {
+      total,
+      passed,
+      errorCounts,
+    },
+    results: combinedResults,
+  });
+}
+
+export async function runComparisonMode(input) {
+  const modelReports = [];
+
+  for (const profile of input.profiles) {
+    modelReports.push(await input.executeModel(profile));
+  }
+
+  return buildMultiModelComparisonReport({
+    suite: input.suite,
+    baselineModelId: input.baselineModelId,
+    modelReports,
+  });
+}
+
+export async function main(argv = process.argv) {
   loadEnvFile(path.join(rootDir, ".env"));
 
   const {
@@ -155,7 +273,10 @@ async function main() {
     sharedDatasetPath,
     memoryGateDatasetPath,
     writeGuardianDatasetPath,
-  } = parseEvalCliOptions(process.argv);
+    modelsConfigPath,
+    models,
+    baselineModelId,
+  } = parseEvalCliOptions(argv);
   const logger = new FileLogger(rootDir, "debug");
   const datasetPaths = resolveEvalDatasetPaths({
     rootDir,
@@ -174,47 +295,80 @@ async function main() {
       ? readJsonl(datasetPaths.writeGuardianDatasetPath)
       : [];
 
-  const evalService = createServiceFromEnv("EVAL");
-  let judgeService = evalService;
+  let failed = false;
 
-  if (
+  if (modelsConfigPath) {
+    const configPath = path.isAbsolute(modelsConfigPath)
+      ? modelsConfigPath
+      : path.join(rootDir, modelsConfigPath);
+    const profiles = await loadEvalModelProfiles({
+      configPath,
+      selectedModelIds: models,
+    });
+    const judgeService =
+      useJudge &&
+      process.env.JUDGE_BASE_URL &&
+      process.env.JUDGE_API_KEY &&
+      process.env.JUDGE_MODEL
+        ? createServiceFromEnv("JUDGE")
+        : undefined;
+
+    const comparisonReport = await runComparisonMode({
+      suite,
+      baselineModelId,
+      profiles,
+      executeModel: async (profile) => {
+        const evalService = createServiceFromProfile(profile);
+        return runSingleModelSuite({
+          suite,
+          scenarios,
+          memoryCases,
+          writerCases,
+          evalService,
+          judgeService: judgeService ?? evalService,
+          useJudge,
+          logger,
+          modelId: profile.id,
+          modelLabel: profile.label,
+        });
+      },
+    });
+
+    failed = comparisonReport.models.some(
+      (report) => report.summary.passed !== report.summary.total
+    );
+    process.exitCode = failed ? 1 : 0;
+    return comparisonReport;
+  }
+
+  const evalService = createServiceFromEnv("EVAL");
+  const judgeService =
     useJudge &&
     process.env.JUDGE_BASE_URL &&
     process.env.JUDGE_API_KEY &&
     process.env.JUDGE_MODEL
-  ) {
-    judgeService = createServiceFromEnv("JUDGE");
-  }
-
-  let failed = false;
-
-  if (suite === "all" || suite === "memory-gate") {
-    const report = await evaluateMemoryGateBenchmark({
-      scenarios,
-      benchmarkCases: memoryCases,
-      executeCase: (scenario) => runMemoryGateCase({ scenario, llmService: evalService, logger }),
-      judge: useJudge ? createJudge(judgeService) : undefined,
-      logger,
-    });
-    printSummary("memory-gate", report);
-    failed ||= report.summary.passed !== report.summary.total;
-  }
-
-  if (suite === "all" || suite === "write-guardian") {
-    const report = await evaluateWriteGuardianBenchmark({
-      scenarios,
-      benchmarkCases: writerCases,
-      executeCase: (scenario) => runWriteGuardianCase({ scenario, llmService: evalService, logger }),
-      logger,
-    });
-    printSummary("write-guardian", report);
-    failed ||= report.summary.passed !== report.summary.total;
-  }
-
+      ? createServiceFromEnv("JUDGE")
+      : evalService;
+  const report = await runSingleModelSuite({
+    suite,
+    scenarios,
+    memoryCases,
+    writerCases,
+    evalService,
+    judgeService,
+    useJudge,
+    logger,
+    modelId: suite,
+    modelLabel: suite,
+  });
+  failed = report.summary.passed !== report.summary.total;
   process.exitCode = failed ? 1 : 0;
+  return report;
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

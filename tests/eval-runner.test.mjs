@@ -438,3 +438,50 @@ test("runWriteGuardianCase supports TOOLS.md scenarios", async () => {
   assert.deepEqual(result.toolTrace, ["read", "write"]);
   assert.match(result.finalContent, /home-server SSH alias refers to devbox\.internal/);
 });
+
+test("runComparisonMode executes multiple model runs and aggregates a comparison report", async () => {
+  const { runComparisonMode } = await import("../evals/run.mjs");
+
+  const report = await runComparisonMode({
+    suite: "memory-gate",
+    baselineModelId: "baseline",
+    profiles: [
+      { id: "baseline", label: "Baseline" },
+      { id: "candidate", label: "Candidate" },
+    ],
+    executeModel: async (profile) =>
+      buildSingleModelRunReport({
+        modelId: profile.id,
+        modelLabel: profile.label,
+        suite: "memory-gate",
+        startedAt: "2026-03-09T10:00:00.000Z",
+        finishedAt: "2026-03-09T10:00:05.000Z",
+        summary: {
+          total: 1,
+          passed: profile.id === "baseline" ? 1 : 0,
+          errorCounts: {
+            provider_error: 0,
+            schema_error: 0,
+            execution_error: 0,
+          },
+        },
+        results: [
+          {
+            scenarioId: "case-1",
+            pass: profile.id === "baseline",
+            decisionPass: profile.id === "baseline",
+            candidatePass: profile.id === "baseline",
+            judgeUsed: false,
+            actualDecision:
+              profile.id === "baseline" ? "UPDATE_USER" : "NO_WRITE",
+            expectedDecision: "UPDATE_USER",
+          },
+        ],
+      }),
+  });
+
+  assert.equal(report.models.length, 2);
+  assert.equal(report.comparison.ranking[0].modelId, "baseline");
+  assert.equal(report.comparison.baselineDiffs[0].modelId, "candidate");
+  assert.deepEqual(report.comparison.baselineDiffs[0].regressedCases, ["case-1"]);
+});

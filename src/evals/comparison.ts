@@ -3,6 +3,7 @@ import type {
   SingleModelRunReport,
   WriteGuardianCaseResult,
 } from "./runner.js";
+import type { EvalSuite } from "./cli.js";
 
 export interface RankedModelReport {
   modelId: string;
@@ -26,6 +27,20 @@ export interface HardestCase {
 export interface DisagreementCase {
   scenarioId: string;
   modelIds: string[];
+}
+
+export interface MultiModelComparisonReport {
+  runId: string;
+  timestamp: string;
+  suite: EvalSuite;
+  baselineModelId?: string;
+  models: SingleModelRunReport[];
+  comparison: {
+    ranking: RankedModelReport[];
+    baselineDiffs: BaselineDiff[];
+    hardestCases: HardestCase[];
+    disagreementCases: DisagreementCase[];
+  };
 }
 
 type EvalCaseResult = MemoryGateCaseResult | WriteGuardianCaseResult;
@@ -201,4 +216,33 @@ export function findDisagreementCases(
       modelIds: entries.map((entry) => entry.modelId),
     }))
     .sort((left, right) => left.scenarioId.localeCompare(right.scenarioId));
+}
+
+export function buildMultiModelComparisonReport(input: {
+  suite: EvalSuite;
+  modelReports: SingleModelRunReport[];
+  baselineModelId?: string;
+  timestamp?: string;
+  runId?: string;
+}): MultiModelComparisonReport {
+  const timestamp = input.timestamp ?? new Date().toISOString();
+  const baselineModelId =
+    input.baselineModelId ??
+    (input.modelReports.length > 0 ? input.modelReports[0].modelId : undefined);
+
+  return {
+    runId: input.runId ?? `${input.suite}-${timestamp}`,
+    timestamp,
+    suite: input.suite,
+    baselineModelId,
+    models: input.modelReports,
+    comparison: {
+      ranking: rankModelReports(input.modelReports),
+      baselineDiffs: baselineModelId
+        ? buildBaselineDiffs(input.modelReports, baselineModelId)
+        : [],
+      hardestCases: findHardestCases(input.modelReports),
+      disagreementCases: findDisagreementCases(input.modelReports),
+    },
+  };
 }
