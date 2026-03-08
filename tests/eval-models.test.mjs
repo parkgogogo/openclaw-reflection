@@ -18,15 +18,13 @@ async function withTempConfig(config, run) {
   }
 }
 
-test("loadEvalModelProfiles loads enabled profiles and resolves api keys", async () => {
+test("loadEvalModelProfiles loads enabled profiles and resolves shared EVAL provider config", async () => {
   await withTempConfig(
     {
       profiles: [
         {
           id: "grok-fast",
           label: "Grok Fast",
-          baseURL: "https://api.x.ai/v1",
-          apiKeyEnv: "XAI_API_KEY",
           model: "x-ai/grok-4.1-fast",
           enabled: true,
           tags: ["baseline"],
@@ -34,8 +32,6 @@ test("loadEvalModelProfiles loads enabled profiles and resolves api keys", async
         {
           id: "disabled-model",
           label: "Disabled",
-          baseURL: "https://example.com",
-          apiKeyEnv: "DISABLED_API_KEY",
           model: "disabled/model",
           enabled: false,
         },
@@ -45,14 +41,15 @@ test("loadEvalModelProfiles loads enabled profiles and resolves api keys", async
       const profiles = await loadEvalModelProfiles({
         configPath,
         env: {
-          XAI_API_KEY: "xai-secret",
-          DISABLED_API_KEY: "disabled-secret",
+          EVAL_BASE_URL: "https://openrouter.ai/api/v1",
+          EVAL_API_KEY: "openrouter-secret",
         },
       });
 
       assert.equal(profiles.length, 1);
       assert.equal(profiles[0].id, "grok-fast");
-      assert.equal(profiles[0].apiKey, "xai-secret");
+      assert.equal(profiles[0].baseURL, "https://openrouter.ai/api/v1");
+      assert.equal(profiles[0].apiKey, "openrouter-secret");
       assert.deepEqual(profiles[0].tags, ["baseline"]);
     }
   );
@@ -65,16 +62,12 @@ test("loadEvalModelProfiles filters to explicitly requested model ids", async ()
         {
           id: "grok-fast",
           label: "Grok Fast",
-          baseURL: "https://api.x.ai/v1",
-          apiKeyEnv: "XAI_API_KEY",
           model: "x-ai/grok-4.1-fast",
           enabled: true,
         },
         {
           id: "gpt-5",
           label: "GPT-5",
-          baseURL: "https://api.openai.com/v1",
-          apiKeyEnv: "OPENAI_API_KEY",
           model: "openai/gpt-5",
           enabled: true,
         },
@@ -85,14 +78,15 @@ test("loadEvalModelProfiles filters to explicitly requested model ids", async ()
         configPath,
         selectedModelIds: ["gpt-5"],
         env: {
-          XAI_API_KEY: "xai-secret",
-          OPENAI_API_KEY: "openai-secret",
+          EVAL_BASE_URL: "https://openrouter.ai/api/v1",
+          EVAL_API_KEY: "openrouter-secret",
         },
       });
 
       assert.equal(profiles.length, 1);
       assert.equal(profiles[0].id, "gpt-5");
-      assert.equal(profiles[0].apiKey, "openai-secret");
+      assert.equal(profiles[0].baseURL, "https://openrouter.ai/api/v1");
+      assert.equal(profiles[0].apiKey, "openrouter-secret");
     }
   );
 });
@@ -118,7 +112,8 @@ test("loadEvalModelProfiles rejects unknown selected model ids", async () => {
             configPath,
             selectedModelIds: ["missing-model"],
             env: {
-              XAI_API_KEY: "xai-secret",
+              EVAL_BASE_URL: "https://openrouter.ai/api/v1",
+              EVAL_API_KEY: "openrouter-secret",
             },
           }),
         /Unknown model ids: missing-model/
@@ -127,15 +122,13 @@ test("loadEvalModelProfiles rejects unknown selected model ids", async () => {
   );
 });
 
-test("loadEvalModelProfiles rejects profiles with missing api keys", async () => {
+test("loadEvalModelProfiles rejects missing shared EVAL_API_KEY", async () => {
   await withTempConfig(
     {
       profiles: [
         {
           id: "grok-fast",
           label: "Grok Fast",
-          baseURL: "https://api.x.ai/v1",
-          apiKeyEnv: "XAI_API_KEY",
           model: "x-ai/grok-4.1-fast",
           enabled: true,
         },
@@ -146,9 +139,38 @@ test("loadEvalModelProfiles rejects profiles with missing api keys", async () =>
         () =>
           loadEvalModelProfiles({
             configPath,
-            env: {},
+            env: {
+              EVAL_BASE_URL: "https://openrouter.ai/api/v1",
+            },
           }),
-        /Missing API key for model grok-fast: env var XAI_API_KEY is not set/
+        /Missing required env vars for model comparison: EVAL_BASE_URL, EVAL_API_KEY/
+      );
+    }
+  );
+});
+
+test("loadEvalModelProfiles rejects missing shared EVAL_BASE_URL", async () => {
+  await withTempConfig(
+    {
+      profiles: [
+        {
+          id: "grok-fast",
+          label: "Grok Fast",
+          model: "x-ai/grok-4.1-fast",
+          enabled: true,
+        },
+      ],
+    },
+    async (configPath) => {
+      await assert.rejects(
+        () =>
+          loadEvalModelProfiles({
+            configPath,
+            env: {
+              EVAL_API_KEY: "openrouter-secret",
+            },
+          }),
+        /Missing required env vars for model comparison: EVAL_BASE_URL, EVAL_API_KEY/
       );
     }
   );

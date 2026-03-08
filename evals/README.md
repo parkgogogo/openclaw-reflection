@@ -33,13 +33,16 @@ Use `evals/models.json` to define the model matrix. Each profile stores:
 
 - `id`
 - `label`
-- `baseURL`
-- `apiKeyEnv`
 - `model`
 - `enabled`
 - optional `tags`
 
-The config file stores only the API key environment variable name, not the secret itself.
+Comparison mode still reads provider settings from `.env` or process environment:
+
+- `EVAL_BASE_URL`
+- `EVAL_API_KEY`
+
+The profile file only defines which models to compare. This mode currently assumes all compared models are reached through the same OpenAI-compatible provider endpoint, such as OpenRouter.
 
 Production plugin config is separate and must continue to use plugin `config.llm.*`.
 

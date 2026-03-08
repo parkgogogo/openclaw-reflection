@@ -205,7 +205,7 @@ node evals/run.mjs \
   --markdown-output evals/results/$(date +%F)-memory-gate-matrix.md
 ```
 
-`evals/models.json` defines the comparison matrix. JSON output is the source of truth for automation and history, while the Markdown artifact is the readable leaderboard summary.
+`evals/models.json` defines only the comparison matrix. The shared provider endpoint and key still come from `EVAL_BASE_URL` and `EVAL_API_KEY`. JSON output is the source of truth for automation and history, while the Markdown artifact is the readable leaderboard summary.
 
 More eval details: [evals/README.md](./evals/README.md)
 

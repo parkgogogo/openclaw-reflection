@@ -107,8 +107,6 @@ Example shape:
     {
       "id": "grok-fast",
       "label": "Grok 4.1 Fast",
-      "baseURL": "https://api.x.ai/v1",
-      "apiKeyEnv": "XAI_API_KEY",
       "model": "x-ai/grok-4.1-fast",
       "enabled": true,
       "tags": ["baseline", "fast"]
@@ -121,7 +119,7 @@ Rules:
 
 - `id` is the stable identifier used in reports and baseline selection
 - `label` is presentation-only
-- `apiKeyEnv` stores the environment variable name, not the secret itself
+- shared provider settings still come from `EVAL_BASE_URL` and `EVAL_API_KEY`
 - `enabled` allows temporary profile removal without deleting history
 - provider-specific request overrides are out of scope for v1
 

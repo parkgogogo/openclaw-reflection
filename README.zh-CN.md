@@ -179,7 +179,7 @@ node evals/run.mjs \
   --markdown-output evals/results/$(date +%F)-memory-gate-matrix.md
 ```
 
-`evals/models.json` 用来定义多模型对比矩阵。JSON 输出是后续自动化和历史追踪的基准，Markdown 输出则是给人看的 leaderboard 摘要。
+`evals/models.json` 只用来定义多模型对比矩阵；共享的 provider endpoint 和 key 仍然来自 `EVAL_BASE_URL` 与 `EVAL_API_KEY`。JSON 输出是后续自动化和历史追踪的基准，Markdown 输出则是给人看的 leaderboard 摘要。
 
 更多评测说明见 [evals/README.md](./evals/README.md)。
 

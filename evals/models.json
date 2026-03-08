@@ -3,8 +3,6 @@
     {
       "id": "grok-fast",
       "label": "Grok 4.1 Fast",
-      "baseURL": "https://api.x.ai/v1",
-      "apiKeyEnv": "XAI_API_KEY",
       "model": "x-ai/grok-4.1-fast",
       "enabled": true,
       "tags": ["baseline", "fast"]
@@ -12,8 +10,6 @@
     {
       "id": "gpt-5",
       "label": "GPT-5",
-      "baseURL": "https://api.openai.com/v1",
-      "apiKeyEnv": "OPENAI_API_KEY",
       "model": "openai/gpt-5",
       "enabled": false,
       "tags": ["reference"]

@@ -3,14 +3,13 @@ import { readFile } from "node:fs/promises";
 export interface EvalModelProfile {
   id: string;
   label: string;
-  baseURL: string;
-  apiKeyEnv: string;
   model: string;
   enabled: boolean;
   tags?: string[];
 }
 
 export interface ResolvedEvalModelProfile extends EvalModelProfile {
+  baseURL: string;
   apiKey: string;
 }
 
@@ -32,8 +31,6 @@ function parseEvalModelProfile(value: unknown): EvalModelProfile {
   const {
     id,
     label,
-    baseURL,
-    apiKeyEnv,
     model,
     enabled,
     tags,
@@ -45,14 +42,6 @@ function parseEvalModelProfile(value: unknown): EvalModelProfile {
 
   if (typeof label !== "string" || label.trim() === "") {
     throw new Error(`Eval model profile ${id} label must be a non-empty string`);
-  }
-
-  if (typeof baseURL !== "string" || baseURL.trim() === "") {
-    throw new Error(`Eval model profile ${id} baseURL must be a non-empty string`);
-  }
-
-  if (typeof apiKeyEnv !== "string" || apiKeyEnv.trim() === "") {
-    throw new Error(`Eval model profile ${id} apiKeyEnv must be a non-empty string`);
   }
 
   if (typeof model !== "string" || model.trim() === "") {
@@ -73,8 +62,6 @@ function parseEvalModelProfile(value: unknown): EvalModelProfile {
   return {
     id,
     label,
-    baseURL,
-    apiKeyEnv,
     model,
     enabled,
     tags,
@@ -95,6 +82,19 @@ export async function loadEvalModelProfiles(
   input: LoadEvalModelProfilesInput
 ): Promise<ResolvedEvalModelProfile[]> {
   const env = input.env ?? process.env;
+  const baseURL = env.EVAL_BASE_URL;
+  const apiKey = env.EVAL_API_KEY;
+  if (
+    typeof baseURL !== "string" ||
+    baseURL.trim() === "" ||
+    typeof apiKey !== "string" ||
+    apiKey.trim() === ""
+  ) {
+    throw new Error(
+      "Missing required env vars for model comparison: EVAL_BASE_URL, EVAL_API_KEY"
+    );
+  }
+
   const profiles = parseEvalModelConfig(await readFile(input.configPath, "utf8"));
   const enabledProfiles = profiles.filter((profile) => profile.enabled);
 
@@ -117,17 +117,9 @@ export async function loadEvalModelProfiles(
           return profile;
         });
 
-  return filteredProfiles.map((profile) => {
-    const apiKey = env[profile.apiKeyEnv];
-    if (typeof apiKey !== "string" || apiKey.trim() === "") {
-      throw new Error(
-        `Missing API key for model ${profile.id}: env var ${profile.apiKeyEnv} is not set`
-      );
-    }
-
-    return {
-      ...profile,
-      apiKey,
-    };
-  });
+  return filteredProfiles.map((profile) => ({
+    ...profile,
+    baseURL,
+    apiKey,
+  }));
 }

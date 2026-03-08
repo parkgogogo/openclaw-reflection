@@ -23,7 +23,7 @@ Cover:
 - loading enabled profiles from a config file
 - filtering to a requested subset of model ids
 - rejecting unknown model ids
-- rejecting profiles whose `apiKeyEnv` is missing from the environment
+- rejecting missing shared `EVAL_BASE_URL` / `EVAL_API_KEY`
 
 **Step 2: Run test to verify it fails**
 
@@ -38,8 +38,6 @@ Add types like:
 export interface EvalModelProfile {
   id: string;
   label: string;
-  baseURL: string;
-  apiKeyEnv: string;
   model: string;
   enabled: boolean;
   tags?: string[];
@@ -51,7 +49,7 @@ Implement helpers to:
 - read `evals/models.json`
 - select enabled profiles
 - optionally filter by requested ids
-- resolve API keys from `process.env`
+- resolve shared `EVAL_BASE_URL` and `EVAL_API_KEY` from `process.env`
 
 **Step 4: Run test to verify it passes**
 
