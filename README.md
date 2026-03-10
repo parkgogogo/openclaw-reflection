@@ -13,7 +13,7 @@
   <img alt="write_guardian 14 cases" src="https://img.shields.io/badge/write_guardian-14%20benchmark%20cases-2ea043?style=flat-square" />
 </p>
 
-Chinese version: [README.zh-CN.md](./README.zh-CN.md)
+<p align="center"><a href="./README.zh-CN.md">中文文档</a></p>
 
 OpenClaw Reflection is an additive layer on top of OpenClaw's built-in Markdown memory system. It captures message flow, keeps thread noise out of long-term memory, writes durable knowledge into the same human-readable memory files OpenClaw already uses, and periodically consolidates them so your agent gets sharper over time instead of messier.
 
