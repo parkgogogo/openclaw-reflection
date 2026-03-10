@@ -20,6 +20,7 @@ import {
   handleBeforeMessageWrite,
   handleMessageReceived,
 } from "./message-handler.js";
+import { OpenClawMessageReactionService } from "./message-reaction.js";
 import { SessionBufferManager } from "./session-manager.js";
 import type {
   LLMService,
@@ -275,6 +276,7 @@ export default function activate(api: PluginAPI): void {
     let memoryGate: MemoryGateAnalyzer | undefined;
     let writeGuardian: WriteGuardian | undefined;
     let writeGuardianAuditLog: WriteGuardianAuditLog | undefined;
+    const reactionService = new OpenClawMessageReactionService(logger);
 
     if (config.memoryGate.enabled && llmService) {
       memoryGate = new MemoryGateAnalyzer(llmService, logger);
@@ -342,7 +344,8 @@ export default function activate(api: PluginAPI): void {
               context,
               memoryGate,
               writeGuardian,
-              config.memoryGate.windowSize
+              config.memoryGate.windowSize,
+              reactionService
             );
           } else {
             logger.warn("PluginLifecycle", "Callback skipped: buffer manager missing", {

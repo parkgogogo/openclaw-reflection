@@ -203,6 +203,81 @@ test('handleBeforeMessageWrite serializes gateway and guardian work per session'
   assert.equal(writeCount, 2);
 });
 
+test('handleBeforeMessageWrite reacts to the latest user message when write_guardian writes memory', async () => {
+  const logger = createLogger();
+  const bufferManager = new SessionBufferManager(10, logger);
+  const reactionCalls = [];
+
+  const memoryGate = {
+    async analyze() {
+      return {
+        decision: 'UPDATE_MEMORY',
+        reason: 'durable shared context',
+        candidateFact: 'user likes brief replies',
+      };
+    },
+  };
+
+  const writeGuardian = {
+    async write() {
+      return {
+        status: 'written',
+      };
+    },
+  };
+
+  const reactionService = {
+    async reactToMessage(input) {
+      reactionCalls.push(input);
+      return true;
+    },
+  };
+
+  handleMessageReceived({
+    from: 'discord:channel:room-6',
+    content: '记住我喜欢简短回复',
+    timestamp: 1773158713165,
+    metadata: {
+      to: 'channel:room-6',
+      provider: 'discord',
+      surface: 'discord',
+      originatingChannel: 'discord',
+      originatingTo: 'channel:room-6',
+      messageId: 'u6',
+      senderId: 'sender-6',
+      senderName: 'Sirocco',
+      senderUsername: 'sirocco_o',
+      guildId: 'guild-6',
+    },
+  }, bufferManager, logger, {
+    channelId: 'discord',
+    accountId: 'default',
+    conversationId: 'channel:room-6',
+  });
+
+  handleBeforeMessageWrite({
+    message: {
+      role: 'assistant',
+      content: [{ type: 'text', text: '我会记住你喜欢简短回复。' }],
+    },
+  }, bufferManager, logger, {
+    sessionKey: 'agent:main:discord:channel:room-6',
+    agentId: 'main',
+  }, memoryGate, writeGuardian, reactionService, 10);
+
+  await flush();
+
+  assert.deepEqual(reactionCalls, [
+    {
+      channelId: 'discord',
+      accountId: 'default',
+      target: 'channel:room-6',
+      messageId: 'u6',
+      emoji: '📝',
+    },
+  ]);
+});
+
 test('handleBeforeMessageWrite ignores non-assistant messages', async () => {
   const logger = createLogger();
   const bufferManager = new SessionBufferManager(10, logger);

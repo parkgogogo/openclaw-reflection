@@ -1,5 +1,12 @@
 import type { SessionBufferManager } from "./session-manager.js";
-import type { Logger, ReflectionMessage } from "./types.js";
+import type {
+  Logger,
+  MessageHookContext,
+  MessageReactionInput,
+  MessageReactionService,
+  MessageReceivedHookEvent,
+  ReflectionMessage,
+} from "./types.js";
 import { MemoryGateAnalyzer, type MemoryGateOutput } from "./memory-gate/index.js";
 import { WriteGuardian } from "./write-guardian/index.js";
 import { ulid } from "ulid";
@@ -24,19 +31,6 @@ interface MessageEvent {
   conversationId?: string;
   accountId?: string;
   channelId?: string;
-}
-
-interface MessageHookContext {
-  channelId?: string;
-  accountId?: string;
-  conversationId?: string;
-}
-
-interface MessageReceivedHookEvent {
-  from?: string;
-  content?: string;
-  timestamp?: number;
-  metadata?: Record<string, unknown>;
 }
 
 interface BeforeMessageWriteEvent {
@@ -480,6 +474,7 @@ function createReflectionMessage(
     messageId: event.message?.id,
     from: event.from,
     to: event.to,
+    accountId: event.accountId,
     success: event.success,
   };
 
@@ -507,6 +502,80 @@ function findLatestMessageByRole(
   return "";
 }
 
+function findLatestUserReactionTarget(
+  messages: ReflectionMessage[]
+): MessageReactionInput | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "user") {
+      continue;
+    }
+
+    const messageId = getNonEmptyString(message.metadata?.messageId);
+    const target = getNonEmptyString(message.metadata?.to);
+    const channelId = getNonEmptyString(message.channelId);
+
+    if (!messageId || !target || !channelId) {
+      continue;
+    }
+
+    return {
+      channelId,
+      accountId: getNonEmptyString(message.metadata?.accountId),
+      target,
+      messageId,
+      emoji: "📝",
+    };
+  }
+
+  return null;
+}
+
+function isReactionService(
+  value: unknown
+): value is MessageReactionService {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "reactToMessage" in value &&
+    typeof (value as { reactToMessage?: unknown }).reactToMessage === "function"
+  );
+}
+
+function resolveHandlerOptions(
+  memoryGateWindowSizeOrReactionService: number | MessageReactionService | undefined,
+  reactionServiceOrWindowSize: MessageReactionService | number | undefined
+): {
+  memoryGateWindowSize: number;
+  reactionService?: MessageReactionService;
+} {
+  const defaultOptions = {
+    memoryGateWindowSize: DEFAULT_MEMORY_GATE_WINDOW_SIZE,
+    reactionService: undefined,
+  } as const;
+
+  if (typeof memoryGateWindowSizeOrReactionService === "number") {
+    return {
+      memoryGateWindowSize: memoryGateWindowSizeOrReactionService,
+      reactionService: isReactionService(reactionServiceOrWindowSize)
+        ? reactionServiceOrWindowSize
+        : undefined,
+    };
+  }
+
+  if (isReactionService(memoryGateWindowSizeOrReactionService)) {
+    return {
+      memoryGateWindowSize:
+        typeof reactionServiceOrWindowSize === "number"
+          ? reactionServiceOrWindowSize
+          : DEFAULT_MEMORY_GATE_WINDOW_SIZE,
+      reactionService: memoryGateWindowSizeOrReactionService,
+    };
+  }
+
+  return defaultOptions;
+}
+
 function isUpdateDecision(
   decision: MemoryGateOutput["decision"]
 ): decision is
@@ -530,7 +599,8 @@ async function triggerMemoryGate(
   memoryGate: MemoryGateAnalyzer,
   writeGuardian: WriteGuardian | undefined,
   logger: Logger,
-  memoryGateWindowSize: number
+  memoryGateWindowSize: number,
+  reactionService?: MessageReactionService
 ): Promise<void> {
   const normalizedWindowSize = Number.isInteger(memoryGateWindowSize)
     ? Math.max(memoryGateWindowSize, 1)
@@ -578,6 +648,11 @@ async function triggerMemoryGate(
             },
             sessionKey
           );
+
+          const reactionTarget = findLatestUserReactionTarget(sessionMessages);
+          if (reactionService && reactionTarget) {
+            await reactionService.reactToMessage(reactionTarget);
+          }
         } else if (writeResult.status === "refused") {
           logger.info(
             "MessageHandler",
@@ -698,8 +773,14 @@ function handleAgentMessage(
   hookContext?: unknown,
   memoryGate?: MemoryGateAnalyzer,
   writeGuardian?: WriteGuardian,
-  memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
+  memoryGateWindowSizeOrReactionService?: number | MessageReactionService,
+  reactionServiceOrWindowSize?: MessageReactionService | number
 ): void {
+  const { memoryGateWindowSize, reactionService } = resolveHandlerOptions(
+    memoryGateWindowSizeOrReactionService,
+    reactionServiceOrWindowSize
+  );
+
   const normalizedEvent = normalizeSentEvent(event, hookContext);
   logHookPayloadDebug(
     logger,
@@ -773,7 +854,8 @@ function handleAgentMessage(
         memoryGate,
         writeGuardian,
         logger,
-        memoryGateWindowSize
+        memoryGateWindowSize,
+        reactionService
       )
     );
   }
@@ -786,7 +868,8 @@ export function handleMessageSent(
   hookContext?: unknown,
   memoryGate?: MemoryGateAnalyzer,
   writeGuardian?: WriteGuardian,
-  memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
+  memoryGateWindowSizeOrReactionService?: number | MessageReactionService,
+  reactionServiceOrWindowSize?: MessageReactionService | number
 ): void {
   handleAgentMessage(
     event,
@@ -796,7 +879,8 @@ export function handleMessageSent(
     hookContext,
     memoryGate,
     writeGuardian,
-    memoryGateWindowSize
+    memoryGateWindowSizeOrReactionService,
+    reactionServiceOrWindowSize
   );
 }
 
@@ -807,7 +891,8 @@ export function handleBeforeMessageWrite(
   hookContext?: unknown,
   memoryGate?: MemoryGateAnalyzer,
   writeGuardian?: WriteGuardian,
-  memoryGateWindowSize = DEFAULT_MEMORY_GATE_WINDOW_SIZE
+  memoryGateWindowSizeOrReactionService?: number | MessageReactionService,
+  reactionServiceOrWindowSize?: MessageReactionService | number
 ): void {
   const normalizedEvent = normalizeBeforeMessageWriteEvent(event, hookContext);
   logHookPayloadDebug(
@@ -834,7 +919,8 @@ export function handleBeforeMessageWrite(
     hookContext,
     memoryGate,
     writeGuardian,
-    memoryGateWindowSize
+    memoryGateWindowSizeOrReactionService,
+    reactionServiceOrWindowSize
   );
 }
 

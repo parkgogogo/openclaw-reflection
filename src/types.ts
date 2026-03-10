@@ -38,8 +38,47 @@ export interface ReflectionMessage {
     from?: string;
     to?: string;
     messageId?: string;
+    accountId?: string;
     success?: boolean;
   };
+}
+
+export interface MessageHookContext {
+  channelId?: string;
+  accountId?: string;
+  conversationId?: string;
+}
+
+export interface MessageReceivedHookMetadata {
+  to?: string;
+  provider?: string;
+  surface?: string;
+  originatingChannel?: string;
+  originatingTo?: string;
+  messageId?: string;
+  senderId?: string;
+  senderName?: string;
+  senderUsername?: string;
+  guildId?: string;
+}
+
+export interface MessageReceivedHookEvent {
+  from?: string;
+  content?: string;
+  timestamp?: number;
+  metadata?: MessageReceivedHookMetadata;
+}
+
+export interface MessageReactionInput {
+  channelId: string;
+  target: string;
+  messageId: string;
+  emoji: string;
+  accountId?: string;
+}
+
+export interface MessageReactionService {
+  reactToMessage(input: MessageReactionInput): Promise<boolean>;
 }
 
 export interface LogEntry {
