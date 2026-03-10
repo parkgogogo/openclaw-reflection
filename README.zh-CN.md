@@ -1,4 +1,4 @@
-# OpenClaw Reflection
+<h1 align="center">OpenClaw Reflection</h1>
 
 <p align="center">
   <img src="./assets/openclaw-reflection-logo.png" alt="OpenClaw Reflection logo" width="180" />
@@ -8,10 +8,12 @@
 
 英文版： [README.md](./README.md)
 
-![OpenClaw Plugin](https://img.shields.io/badge/OpenClaw-Plugin-111111?style=flat-square)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square)
-![memory_gate 18 cases](https://img.shields.io/badge/memory_gate-18%20benchmark%20cases-2ea043?style=flat-square)
-![write_guardian 14 cases](https://img.shields.io/badge/write_guardian-14%20benchmark%20cases-2ea043?style=flat-square)
+<p align="center">
+  <img alt="OpenClaw Plugin" src="https://img.shields.io/badge/OpenClaw-Plugin-111111?style=flat-square" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square" />
+  <img alt="memory_gate 18 cases" src="https://img.shields.io/badge/memory_gate-18%20benchmark%20cases-2ea043?style=flat-square" />
+  <img alt="write_guardian 14 cases" src="https://img.shields.io/badge/write_guardian-14%20benchmark%20cases-2ea043?style=flat-square" />
+</p>
 
 OpenClaw Reflection 是叠加在 OpenClaw 原生 Markdown memory 之上的一层增强插件。它负责监听消息流，过滤线程噪音，把真正长期有效的信息写回 OpenClaw 的核心记忆文件，并定期整理这些文件，避免长期使用后越记越乱。
 

@@ -1,4 +1,4 @@
-# OpenClaw Reflection
+<h1 align="center">OpenClaw Reflection</h1>
 
 <p align="center">
   <img src="./assets/openclaw-reflection-logo.png" alt="OpenClaw Reflection logo" width="180" />
@@ -6,10 +6,12 @@
 
 <p align="center"><strong>Make OpenClaw's native memory system sharper without replacing it.</strong></p>
 
-![OpenClaw Plugin](https://img.shields.io/badge/OpenClaw-Plugin-111111?style=flat-square)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square)
-![memory_gate 18 cases](https://img.shields.io/badge/memory_gate-18%20benchmark%20cases-2ea043?style=flat-square)
-![write_guardian 14 cases](https://img.shields.io/badge/write_guardian-14%20benchmark%20cases-2ea043?style=flat-square)
+<p align="center">
+  <img alt="OpenClaw Plugin" src="https://img.shields.io/badge/OpenClaw-Plugin-111111?style=flat-square" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square" />
+  <img alt="memory_gate 18 cases" src="https://img.shields.io/badge/memory_gate-18%20benchmark%20cases-2ea043?style=flat-square" />
+  <img alt="write_guardian 14 cases" src="https://img.shields.io/badge/write_guardian-14%20benchmark%20cases-2ea043?style=flat-square" />
+</p>
 
 Chinese version: [README.zh-CN.md](./README.zh-CN.md)
 
