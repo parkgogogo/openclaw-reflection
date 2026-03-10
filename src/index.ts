@@ -13,6 +13,10 @@ import {
 } from "./memory-gate/index.js";
 import { WriteGuardian } from "./write-guardian/index.js";
 import {
+  WriteGuardianAuditLog,
+  type WriteGuardianAuditEntry,
+} from "./write-guardian/audit-log.js";
+import {
   handleBeforeMessageWrite,
   handleMessageReceived,
 } from "./message-handler.js";
@@ -47,12 +51,64 @@ export interface PluginAPI {
     handler: (event: unknown, context?: unknown) => void,
     options?: { priority?: number }
   ) => void;
+  registerCommand?: (
+    command: string,
+    handler: (args?: string) => string | Promise<string>
+  ) => void;
 }
 
 let bufferManager: SessionBufferManager | null = null;
 let gatewayLogger: PluginLogger | null = null;
 let fileLogger: FileLogger | null = null;
 let isRegistered = false;
+
+function formatWriteGuardianAudit(entries: WriteGuardianAuditEntry[]): string {
+  if (entries.length === 0) {
+    return "No write_guardian records found.";
+  }
+
+  const lines = entries.map((entry, index) => {
+    const summary = [
+      `${index + 1}. [${entry.timestamp}] ${entry.status}`,
+      `decision=${entry.decision}`,
+      entry.targetFile ? `file=${entry.targetFile}` : undefined,
+      entry.reason ? `reason=${entry.reason}` : undefined,
+      entry.candidateFact ? `fact=${entry.candidateFact}` : undefined,
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join(" | ");
+
+    return summary;
+  });
+
+  return lines.join("\n");
+}
+
+function registerReflectionCommand(
+  api: PluginAPI,
+  logger: FileLogger,
+  auditLog?: WriteGuardianAuditLog
+): void {
+  if (typeof api.registerCommand !== "function") {
+    logger.info("PluginLifecycle", "registerCommand unavailable, skip command registration", {
+      command: "/openclaw-reflection",
+    });
+    return;
+  }
+
+  api.registerCommand("/openclaw-reflection", async () => {
+    if (!auditLog) {
+      return "write_guardian audit log unavailable: workspace is not configured.";
+    }
+
+    const entries = await auditLog.readRecent(10);
+    return formatWriteGuardianAudit(entries);
+  });
+
+  logger.info("PluginLifecycle", "Registered plugin command", {
+    command: "/openclaw-reflection",
+  });
+}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -206,6 +262,7 @@ export default function activate(api: PluginAPI): void {
 
     let memoryGate: MemoryGateAnalyzer | undefined;
     let writeGuardian: WriteGuardian | undefined;
+    let writeGuardianAuditLog: WriteGuardianAuditLog | undefined;
 
     if (config.memoryGate.enabled && llmService) {
       memoryGate = new MemoryGateAnalyzer(llmService, logger);
@@ -217,7 +274,13 @@ export default function activate(api: PluginAPI): void {
     }
 
     if (llmService && workspaceDir) {
-      writeGuardian = new WriteGuardian({ workspaceDir }, logger, llmService);
+      writeGuardianAuditLog = new WriteGuardianAuditLog(workspaceDir);
+      writeGuardian = new WriteGuardian(
+        { workspaceDir },
+        logger,
+        llmService,
+        writeGuardianAuditLog
+      );
       logger.info("PluginLifecycle", "write_guardian initialized", {
         workspaceDir,
       });
@@ -302,6 +365,8 @@ export default function activate(api: PluginAPI): void {
         });
       }
     );
+
+    registerReflectionCommand(api, logger, writeGuardianAuditLog);
 
     gatewayLogger.info("[Reflection] Message hooks registered");
     logger.info("PluginLifecycle", "Message hooks registered");
