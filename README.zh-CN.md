@@ -102,6 +102,13 @@ openclaw plugins install @parkgogogo/openclaw-reflection
 
 Gateway 重启后，Reflection 就会开始监听 `message_received` 和 `before_message_write`，并把整理后的长期信息写入你配置的 `workspaceDir`。
 
+### 可观测性命令
+
+- Reflection 现在会给 write_guardian 单独写一份审计日志：
+  - `<workspaceDir>/.openclaw-reflection/write-guardian.log.jsonl`
+- 注册命令：`/openclaw-reflection`
+  - 返回最近 10 条 write_guardian 行为（written/refused/failed/skipped），包含 decision、目标文件和原因。
+
 ## 你会得到什么
 
 | 你想要的能力             | Reflection 提供的结果                          |

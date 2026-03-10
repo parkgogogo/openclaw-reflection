@@ -1,6 +1,7 @@
 import * as path from "path";
 import type { AgentTool, LLMService, MemoryGateOutput, Logger } from "../types.js";
 import { readFile, writeFileWithLock } from "../utils/file-utils.js";
+import { WriteGuardianAuditLog } from "./audit-log.js";
 
 type UpdateDecision =
   | "UPDATE_MEMORY"
@@ -93,16 +94,25 @@ export class WriteGuardian {
   private config: WriteGuardianConfig;
   private logger: Logger;
   private llmService: LLMService;
+  private auditLog?: WriteGuardianAuditLog;
 
-  constructor(config: WriteGuardianConfig, logger: Logger, llmService: LLMService) {
+  constructor(
+    config: WriteGuardianConfig,
+    logger: Logger,
+    llmService: LLMService,
+    auditLog?: WriteGuardianAuditLog
+  ) {
     this.config = config;
     this.logger = logger;
     this.llmService = llmService;
+    this.auditLog = auditLog;
   }
 
   async write(output: MemoryGateOutput): Promise<WriteGuardianWriteResult> {
     if (!isUpdateDecision(output.decision)) {
-      return { status: "skipped", reason: "not an update decision" };
+      const result = { status: "skipped", reason: "not an update decision" } as const;
+      await this.recordAudit(output, result);
+      return result;
     }
 
     const candidateFact = output.candidateFact?.trim();
@@ -111,7 +121,9 @@ export class WriteGuardian {
         decision: output.decision,
         reason: output.reason,
       });
-      return { status: "skipped", reason: "missing candidate fact" };
+      const result = { status: "skipped", reason: "missing candidate fact" } as const;
+      await this.recordAudit(output, result);
+      return result;
     }
 
     const targetFile = TARGET_FILES[output.decision];
@@ -141,14 +153,18 @@ export class WriteGuardian {
           filePath,
           reason,
         });
-        return { status: "refused", reason };
+        const writeResult = { status: "refused", reason } as const;
+        await this.recordAudit(output, writeResult, targetFile);
+        return writeResult;
       }
 
       this.logger.info("WriteGuardian", "write_guardian rewrote target file", {
         decision: output.decision,
         filePath,
       });
-      return { status: "written" };
+      const writeResult = { status: "written" } as const;
+      await this.recordAudit(output, writeResult, targetFile);
+      return writeResult;
     } catch (error) {
       const reason = getErrorMessage(error);
       this.logger.error("WriteGuardian", "write_guardian execution failed", {
@@ -156,7 +172,33 @@ export class WriteGuardian {
         filePath,
         reason,
       });
-      return { status: "failed", reason };
+      const writeResult = { status: "failed", reason } as const;
+      await this.recordAudit(output, writeResult, targetFile);
+      return writeResult;
+    }
+  }
+
+  private async recordAudit(
+    output: MemoryGateOutput,
+    result: WriteGuardianWriteResult,
+    targetFile?: CuratedFilename
+  ): Promise<void> {
+    if (!this.auditLog) {
+      return;
+    }
+
+    try {
+      await this.auditLog.append({
+        decision: output.decision,
+        targetFile,
+        status: result.status,
+        reason: result.reason,
+        candidateFact: output.candidateFact,
+      });
+    } catch (error) {
+      this.logger.warn("WriteGuardian", "Failed to append write_guardian audit log", {
+        reason: getErrorMessage(error),
+      });
     }
   }
 

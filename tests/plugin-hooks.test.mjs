@@ -75,3 +75,33 @@ test('activate prefers api.on for before_message_write and message_received', as
     []
   );
 });
+
+test('activate registers /openclaw-reflection command when registerCommand is available', async () => {
+  const indexUrl = pathToFileURL(path.join(process.cwd(), 'dist/index.js')).href;
+  const mod = await import(`${indexUrl}?t=${Date.now()}-command`);
+  const activate = mod.default;
+
+  const commands = [];
+  const api = {
+    logger: createPluginLogger(),
+    config: {
+      get(key) {
+        if (key === 'memoryGate') return { enabled: false };
+        if (key === 'consolidation') return { enabled: false };
+        return undefined;
+      },
+    },
+    registerHook() {},
+    registerCommand(command, handler) {
+      commands.push({ command, handler });
+    },
+  };
+
+  activate(api);
+
+  assert.equal(commands.length, 1);
+  assert.equal(commands[0].command, '/openclaw-reflection');
+
+  const result = await commands[0].handler();
+  assert.match(result, /No write_guardian records found|audit log unavailable/);
+});

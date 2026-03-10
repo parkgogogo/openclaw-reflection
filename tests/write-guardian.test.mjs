@@ -5,6 +5,7 @@ import path from "node:path";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 
 import { WriteGuardian } from "../dist/write-guardian/index.js";
+import { WriteGuardianAuditLog } from "../dist/write-guardian/audit-log.js";
 
 function createLogger() {
   const entries = [];
@@ -266,6 +267,41 @@ test("WriteGuardian returns failed status when write_guardian execution fails", 
       status: "failed",
       reason: "provider timeout",
     });
+  } finally {
+    await rm(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test("WriteGuardian appends audit log entries for write outcomes", async () => {
+  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "reflection-curator-"));
+  const auditLog = new WriteGuardianAuditLog(workspaceDir);
+
+  const llmService = {
+    async runAgent(params) {
+      const writeTool = params.tools.find((tool) => tool.name === "write");
+      await writeTool.execute({ content: "# USER\n\n- prefers concise diffs\n" });
+      return {
+        didWrite: true,
+        finalMessage: "updated",
+        steps: [],
+      };
+    },
+  };
+
+  try {
+    const guardian = new WriteGuardian({ workspaceDir }, createLogger(), llmService, auditLog);
+    await guardian.write({
+      decision: "UPDATE_USER",
+      reason: "stable preference",
+      candidateFact: "prefers concise diffs",
+    });
+
+    const entries = await auditLog.readRecent(10);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].status, "written");
+    assert.equal(entries[0].decision, "UPDATE_USER");
+    assert.equal(entries[0].targetFile, "USER.md");
+    assert.equal(entries[0].candidateFact, "prefers concise diffs");
   } finally {
     await rm(workspaceDir, { recursive: true, force: true });
   }
