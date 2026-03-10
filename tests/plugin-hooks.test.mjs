@@ -79,7 +79,7 @@ test('activate prefers api.on for before_message_write and message_received', as
   );
 });
 
-test('activate registers /reflections command when registerCommand is available', async () => {
+test('activate registers reflections command with OpenClaw command object signature', async () => {
   const indexUrl = pathToFileURL(path.join(process.cwd(), 'dist/index.js')).href;
   const mod = await import(`${indexUrl}?t=${Date.now()}-command`);
   const activate = mod.default;
@@ -95,18 +95,20 @@ test('activate registers /reflections command when registerCommand is available'
       },
     },
     registerHook() {},
-    registerCommand(command, handler) {
-      commands.push({ command, handler });
+    registerCommand(command) {
+      commands.push(command);
     },
   };
 
   activate(api);
 
   assert.equal(commands.length, 1);
-  assert.equal(commands[0].command, '/reflections');
+  assert.equal(commands[0].name, 'reflections');
+  assert.equal(typeof commands[0].description, 'string');
+  assert.equal(typeof commands[0].handler, 'function');
 
   const result = await commands[0].handler();
-  assert.match(result, /No write_guardian records found|audit log unavailable/);
+  assert.match(result.text, /No write_guardian records found|audit log unavailable/);
 });
 
 test('activate writes the latest message_received payload to logs/debug.json in debug mode', async () => {

@@ -52,8 +52,11 @@ export interface PluginAPI {
     options?: { priority?: number }
   ) => void;
   registerCommand?: (
-    command: string,
-    handler: (args?: string) => string | Promise<string>
+    command: {
+      name: string;
+      description: string;
+      handler: (args?: string) => { text: string } | Promise<{ text: string }>;
+    }
   ) => void;
 }
 
@@ -61,7 +64,7 @@ let bufferManager: SessionBufferManager | null = null;
 let gatewayLogger: PluginLogger | null = null;
 let fileLogger: FileLogger | null = null;
 let isRegistered = false;
-const REFLECTION_COMMAND = "/reflections";
+const REFLECTION_COMMAND_NAME = "reflections";
 
 function formatWriteGuardianAudit(entries: WriteGuardianAuditEntry[]): string {
   if (entries.length === 0) {
@@ -92,22 +95,30 @@ function registerReflectionCommand(
 ): void {
   if (typeof api.registerCommand !== "function") {
     logger.info("PluginLifecycle", "registerCommand unavailable, skip command registration", {
-      command: REFLECTION_COMMAND,
+      command: REFLECTION_COMMAND_NAME,
     });
     return;
   }
 
-  api.registerCommand(REFLECTION_COMMAND, async () => {
-    if (!auditLog) {
-      return "write_guardian audit log unavailable: workspace is not configured.";
-    }
+  api.registerCommand({
+    name: REFLECTION_COMMAND_NAME,
+    description: "Show recent write_guardian audit entries",
+    handler: async () => {
+      if (!auditLog) {
+        return {
+          text: "write_guardian audit log unavailable: workspace is not configured.",
+        };
+      }
 
-    const entries = await auditLog.readRecent(10);
-    return formatWriteGuardianAudit(entries);
+      const entries = await auditLog.readRecent(10);
+      return {
+        text: formatWriteGuardianAudit(entries),
+      };
+    },
   });
 
   logger.info("PluginLifecycle", "Registered plugin command", {
-    command: REFLECTION_COMMAND,
+    command: REFLECTION_COMMAND_NAME,
   });
 }
 
