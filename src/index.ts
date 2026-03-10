@@ -61,6 +61,7 @@ let bufferManager: SessionBufferManager | null = null;
 let gatewayLogger: PluginLogger | null = null;
 let fileLogger: FileLogger | null = null;
 let isRegistered = false;
+const REFLECTION_COMMAND = "/reflections";
 
 function formatWriteGuardianAudit(entries: WriteGuardianAuditEntry[]): string {
   if (entries.length === 0) {
@@ -91,12 +92,12 @@ function registerReflectionCommand(
 ): void {
   if (typeof api.registerCommand !== "function") {
     logger.info("PluginLifecycle", "registerCommand unavailable, skip command registration", {
-      command: "/openclaw-reflection",
+      command: REFLECTION_COMMAND,
     });
     return;
   }
 
-  api.registerCommand("/openclaw-reflection", async () => {
+  api.registerCommand(REFLECTION_COMMAND, async () => {
     if (!auditLog) {
       return "write_guardian audit log unavailable: workspace is not configured.";
     }
@@ -106,7 +107,7 @@ function registerReflectionCommand(
   });
 
   logger.info("PluginLifecycle", "Registered plugin command", {
-    command: "/openclaw-reflection",
+    command: REFLECTION_COMMAND,
   });
 }
 

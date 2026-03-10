@@ -111,7 +111,7 @@ Once the gateway restarts, Reflection will begin listening to `message_received`
 
 - Reflection now writes an independent write_guardian audit log to:
   - `<workspaceDir>/.openclaw-reflection/write-guardian.log.jsonl`
-- Register command: `/openclaw-reflection`
+- Register command: `/reflections`
   - Returns the most recent 10 write_guardian behaviors (written/refused/failed/skipped), including decision, target file, and reason.
 
 ## What You Get
