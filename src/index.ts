@@ -347,6 +347,8 @@ export default function activate(api: PluginAPI): void {
       "message_received",
       (event: unknown, context?: unknown) => {
         runHookSafely(logger, "message_received", () => {
+          logger.writeLatestDebugPayload("message_received", event, context);
+
           logger.debug("PluginLifecycle", "Callback invoked", {
             hook: "message_received",
             hasContext: context !== undefined,

@@ -45,6 +45,10 @@ export class FileLogger {
     return path.join(this.logsDir, `reflection-${date}.log`);
   }
 
+  private getDebugFilePath(): string {
+    return path.join(this.logsDir, "debug.json");
+  }
+
   private shouldLog(level: LogLevel): boolean {
     return LOG_LEVELS[level] >= LOG_LEVELS[this.level];
   }
@@ -61,6 +65,30 @@ export class FileLogger {
       fs.appendFileSync(logFile, logLine, "utf-8");
     } catch (error) {
       console.error("[ReflectionPlugin] Failed to write log:", error);
+    }
+  }
+
+  writeLatestDebugPayload(
+    hookName: string,
+    event: unknown,
+    hookContext?: unknown
+  ): void {
+    if (!this.shouldLog("debug")) {
+      return;
+    }
+
+    const debugFile = this.getDebugFilePath();
+    const payload = {
+      timestamp: this.formatTimestamp(),
+      hookName,
+      event,
+      hookContext,
+    };
+
+    try {
+      fs.writeFileSync(debugFile, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+    } catch (error) {
+      console.error("[ReflectionPlugin] Failed to write debug payload:", error);
     }
   }
 

@@ -106,6 +106,7 @@ Gateway 重启后，Reflection 就会开始监听 `message_received` 和 `before
 
 - Reflection 现在会给 write_guardian 单独写一份审计日志：
   - `<workspaceDir>/.openclaw-reflection/write-guardian.log.jsonl`
+- 当 `logLevel` 为 `debug` 时，Reflection 还会把最近一次 `message_received` callback 的原始 payload 覆盖写入 `logs/debug.json`。
 - 注册命令：`/reflections`
   - 返回最近 10 条 write_guardian 行为（written/refused/failed/skipped），包含 decision、目标文件和原因。
 
