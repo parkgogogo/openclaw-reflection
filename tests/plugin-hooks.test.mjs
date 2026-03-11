@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -88,15 +89,14 @@ test('activate registers reflections command with OpenClaw command object signat
   const mod = await import(`${indexUrl}?t=${Date.now()}-command`);
   const activate = mod.default;
 
+  const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'reflection-plugin-command-'));
   const commands = [];
   const api = {
     logger: createPluginLogger(),
-    config: {
-      get(key) {
-        if (key === 'memoryGate') return { enabled: false };
-        if (key === 'consolidation') return { enabled: false };
-        return undefined;
-      },
+    pluginConfig: {
+      workspaceDir,
+      memoryGate: { enabled: false },
+      consolidation: { enabled: false },
     },
     registerHook() {},
     registerCommand(command) {
@@ -104,15 +104,122 @@ test('activate registers reflections command with OpenClaw command object signat
     },
   };
 
-  activate(api);
+  try {
+    activate(api);
 
-  assert.equal(commands.length, 1);
-  assert.equal(commands[0].name, 'reflections');
-  assert.equal(typeof commands[0].description, 'string');
-  assert.equal(typeof commands[0].handler, 'function');
+    assert.equal(commands.length, 1);
+    assert.equal(commands[0].name, 'reflection');
+    assert.equal(commands[0].acceptsArgs, true);
+    assert.equal(typeof commands[0].description, 'string');
+    assert.equal(typeof commands[0].handler, 'function');
 
-  const result = await commands[0].handler();
-  assert.match(result.text, /No write_guardian records found|audit log unavailable/);
+    const result = await commands[0].handler({
+      channel: 'discord',
+      isAuthorizedSender: true,
+      commandBody: '/reflection files',
+      args: 'files',
+      config: {},
+    });
+    assert.match(result.text, /USER\.md/);
+    assert.match(result.text, /MEMORY\.md/);
+  } finally {
+    await fs.rm(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test('activate registers reflection gateway methods when workspace is configured', async () => {
+  const indexUrl = pathToFileURL(path.join(process.cwd(), 'dist/index.js')).href;
+  const mod = await import(`${indexUrl}?t=${Date.now()}-gateway-methods`);
+  const activate = mod.default;
+
+  const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'reflection-plugin-gateway-'));
+  const gatewayMethods = [];
+  const api = {
+    logger: createPluginLogger(),
+    pluginConfig: {
+      workspaceDir,
+      memoryGate: { enabled: false },
+      consolidation: { enabled: false },
+    },
+    registerHook() {},
+    registerCommand() {},
+    registerGatewayMethod(method, handler) {
+      gatewayMethods.push({ method, handler });
+    },
+  };
+
+  try {
+    activate(api);
+
+    assert.equal(
+      gatewayMethods.some((entry) => entry.method === 'reflection.files'),
+      true
+    );
+    assert.equal(
+      gatewayMethods.some((entry) => entry.method === 'reflection.file'),
+      true
+    );
+    assert.equal(
+      gatewayMethods.some((entry) => entry.method === 'reflection.apply'),
+      true
+    );
+
+    let response;
+    await gatewayMethods.find((entry) => entry.method === 'reflection.files').handler({
+      req: { id: 'req-1' },
+      params: {},
+      client: null,
+      isWebchatConnect() {
+        return false;
+      },
+      context: {},
+      respond(ok, payload) {
+        response = { ok, payload };
+      },
+    });
+
+    assert.deepEqual(response.ok, true);
+    assert.equal(Array.isArray(response.payload.files), true);
+  } finally {
+    await fs.rm(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test('activate registers reflection inspection and proposal tools', async () => {
+  const indexUrl = pathToFileURL(path.join(process.cwd(), 'dist/index.js')).href;
+  const mod = await import(`${indexUrl}?t=${Date.now()}-tools`);
+  const activate = mod.default;
+
+  const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'reflection-plugin-tools-'));
+  const tools = [];
+  const api = {
+    logger: createPluginLogger(),
+    pluginConfig: {
+      workspaceDir,
+      memoryGate: { enabled: false },
+      consolidation: { enabled: false },
+    },
+    registerHook() {},
+    registerCommand() {},
+    registerTool(tool) {
+      tools.push(tool);
+    },
+  };
+
+  try {
+    activate(api);
+
+    const toolNames = tools.map((tool) => tool.name).sort();
+    assert.deepEqual(toolNames, [
+      'reflection_check_drift',
+      'reflection_fact_view',
+      'reflection_file_view',
+      'reflection_files',
+      'reflection_propose',
+    ]);
+  } finally {
+    await fs.rm(workspaceDir, { recursive: true, force: true });
+  }
 });
 
 test('activate writes the latest message_received payload to logs/debug.json in debug mode', async () => {

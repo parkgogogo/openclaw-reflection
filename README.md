@@ -60,8 +60,14 @@ openclaw plugins install @parkgogogo/openclaw-reflection
 - When `logLevel` is `debug`, Reflection also overwrites `logs/debug.json` with the latest raw `message_received` callback payload.
 - Reflection also writes periodic `Heartbeat` events into the normal plugin log. If heartbeat keeps advancing while `lastMessageReceivedAt` stays stale, the plugin is alive and simply not receiving inbound traffic.
 - When `write_guardian` successfully writes durable memory, Reflection reacts to the triggering user message with `📝`.
-- Register command: `reflections`
-  - Returns the most recent 10 write_guardian behaviors (written/refused/failed/skipped), including decision, target file, and reason.
+- Register command: `reflection`
+  - `reflection files`
+  - `reflection file USER.md`
+  - `reflection fact <fact-id>`
+  - `reflection propose delete|edit|move ...`
+  - `reflection apply <proposal-id>`
+  - `reflection discard <proposal-id>`
+  - `reflection reconcile <file-name> --mode overwrite|adopt|detach`
 
 For detailed install instructions, see [INSTALL.md](./INSTALL.md).
 
@@ -77,6 +83,12 @@ Reflection adds intelligence to OpenClaw's existing Markdown memory system. It d
 3. `write_guardian` checks file responsibilities and decides: *Accept, reject, or merge?*
 4. Clean, curated facts get written to your workspace memory files
 5. Optional consolidation keeps long-term files compact over time
+
+**Memory management layer:**
+- Reflection keeps managed facts inside explicit managed regions in each core memory file
+- Free text outside the managed region stays user-owned and is preserved during proposal application
+- Every managed fact keeps provenance and lifecycle history locally
+- Mutations flow through proposal creation, review, and explicit apply/discard steps
 
 **What makes Reflection different:**
 - No separate database — uses the same Markdown files you already have
@@ -201,6 +213,9 @@ See what Reflection is doing:
 **Audit log**
 `write_guardian` writes decisions to `<workspaceDir>/.openclaw-reflection/write-guardian.log.jsonl`
 
+**Managed fact store**
+Reflection also persists managed facts, lifecycle events, and proposals under `<workspaceDir>/.openclaw-reflection/`
+
 **Debug mode**
 When `logLevel` is `debug`, raw `message_received` payloads go to `logs/debug.json`
 
@@ -208,7 +223,12 @@ When `logLevel` is `debug`, raw `message_received` payloads go to `logs/debug.js
 Successful memory writes get a `📝` reaction on the triggering message
 
 **Command**
-`reflections` returns the last 10 `write_guardian` decisions with target file and reason
+`reflection` exposes the file-first memory workflow:
+- `reflection files` lists managed files and health
+- `reflection file <file>` shows facts and drift state
+- `reflection fact <fact-id>` shows provenance and lifecycle
+- `reflection proposal|apply|discard ...` handles proposal review and mutation
+- `reflection reconcile <file> --mode ...` resolves managed-region drift
 
 ---
 
@@ -217,10 +237,14 @@ Successful memory writes get a `📝` reaction on the triggering message
 Reflection currently supports:
 - A single agent
 - Multiple sessions for that same agent
+- File-first memory inspection and proposal-based delete/edit/move flows
+- Managed-region drift detection and reconciliation commands
 
 **Not yet supported:**
 - Multi-agent memory coordination
 - Per-agent routing across multiple agents in one OpenClaw setup
+- Automatic adoption of arbitrary free text outside managed regions
+- Autonomous agent-side proposal apply
 
 ---
 

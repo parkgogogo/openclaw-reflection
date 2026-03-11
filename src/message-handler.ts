@@ -1,6 +1,7 @@
 import type { SessionBufferManager } from "./session-manager.js";
 import type {
   Logger,
+  ManagedFileName,
   MessageHookContext,
   MessageReactionInput,
   MessageReactionService,
@@ -12,6 +13,20 @@ import { WriteGuardian } from "./write-guardian/index.js";
 import { ulid } from "ulid";
 
 const DEFAULT_MEMORY_GATE_WINDOW_SIZE = 10;
+
+interface ManagedWriteRecorder {
+  recordManagedWrite(input: {
+    fileName: ManagedFileName;
+    text: string;
+    provenance: {
+      decision: MemoryGateOutput["decision"];
+      reason: string;
+      recordedAt: string;
+      sessionKey?: string;
+      sourceMessageId?: string;
+    };
+  }): Promise<unknown>;
+}
 
 interface MessageEvent {
   role?: string;
@@ -502,6 +517,19 @@ function findLatestMessageByRole(
   return "";
 }
 
+function findLatestBufferMessageByRole(
+  messages: ReflectionMessage[],
+  role: ReflectionMessage["role"]
+): ReflectionMessage | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === role) {
+      return messages[index];
+    }
+  }
+
+  return undefined;
+}
+
 function findLatestUserReactionTarget(
   messages: ReflectionMessage[]
 ): MessageReactionInput | null {
@@ -593,6 +621,26 @@ function isUpdateDecision(
   );
 }
 
+function resolveManagedFileName(
+  decision: Extract<
+    MemoryGateOutput["decision"],
+    "UPDATE_MEMORY" | "UPDATE_USER" | "UPDATE_SOUL" | "UPDATE_IDENTITY" | "UPDATE_TOOLS"
+  >
+): ManagedFileName {
+  switch (decision) {
+    case "UPDATE_MEMORY":
+      return "MEMORY.md";
+    case "UPDATE_USER":
+      return "USER.md";
+    case "UPDATE_SOUL":
+      return "SOUL.md";
+    case "UPDATE_IDENTITY":
+      return "IDENTITY.md";
+    case "UPDATE_TOOLS":
+      return "TOOLS.md";
+  }
+}
+
 async function triggerMemoryGate(
   sessionKey: string,
   bufferManager: SessionBufferManager,
@@ -600,7 +648,8 @@ async function triggerMemoryGate(
   writeGuardian: WriteGuardian | undefined,
   logger: Logger,
   memoryGateWindowSize: number,
-  reactionService?: MessageReactionService
+  reactionService?: MessageReactionService,
+  managedWriteRecorder?: ManagedWriteRecorder
 ): Promise<void> {
   const normalizedWindowSize = Number.isInteger(memoryGateWindowSize)
     ? Math.max(memoryGateWindowSize, 1)
@@ -617,6 +666,7 @@ async function triggerMemoryGate(
 
   const currentUserMessage = findLatestMessageByRole(sessionMessages, "user");
   const currentAgentReply = findLatestMessageByRole(sessionMessages, "agent");
+  const currentUserBufferMessage = findLatestBufferMessageByRole(sessionMessages, "user");
 
   try {
     const output: MemoryGateOutput = await memoryGate.analyze({
@@ -652,6 +702,20 @@ async function triggerMemoryGate(
           const reactionTarget = findLatestUserReactionTarget(sessionMessages);
           if (reactionService && reactionTarget) {
             await reactionService.reactToMessage(reactionTarget);
+          }
+
+          if (managedWriteRecorder && output.candidateFact) {
+            await managedWriteRecorder.recordManagedWrite({
+              fileName: resolveManagedFileName(output.decision),
+              text: output.candidateFact,
+              provenance: {
+                decision: output.decision,
+                reason: output.reason,
+                recordedAt: new Date().toISOString(),
+                sessionKey,
+                sourceMessageId: currentUserBufferMessage?.metadata?.messageId,
+              },
+            });
           }
         } else if (writeResult.status === "refused") {
           logger.info(
@@ -776,7 +840,8 @@ function handleAgentMessage(
   memoryGate?: MemoryGateAnalyzer,
   writeGuardian?: WriteGuardian,
   memoryGateWindowSizeOrReactionService?: number | MessageReactionService,
-  reactionServiceOrWindowSize?: MessageReactionService | number
+  reactionServiceOrWindowSize?: MessageReactionService | number,
+  managedWriteRecorder?: ManagedWriteRecorder
 ): void {
   const { memoryGateWindowSize, reactionService } = resolveHandlerOptions(
     memoryGateWindowSizeOrReactionService,
@@ -857,7 +922,8 @@ function handleAgentMessage(
         writeGuardian,
         logger,
         memoryGateWindowSize,
-        reactionService
+        reactionService,
+        managedWriteRecorder
       )
     );
   }
@@ -871,7 +937,8 @@ export function handleMessageSent(
   memoryGate?: MemoryGateAnalyzer,
   writeGuardian?: WriteGuardian,
   memoryGateWindowSizeOrReactionService?: number | MessageReactionService,
-  reactionServiceOrWindowSize?: MessageReactionService | number
+  reactionServiceOrWindowSize?: MessageReactionService | number,
+  managedWriteRecorder?: ManagedWriteRecorder
 ): void {
   handleAgentMessage(
     event,
@@ -882,7 +949,8 @@ export function handleMessageSent(
     memoryGate,
     writeGuardian,
     memoryGateWindowSizeOrReactionService,
-    reactionServiceOrWindowSize
+    reactionServiceOrWindowSize,
+    managedWriteRecorder
   );
 }
 
@@ -895,7 +963,8 @@ export function handleBeforeMessageWrite(
   writeGuardian?: WriteGuardian,
   memoryGateWindowSizeOrReactionService?: number | MessageReactionService,
   reactionServiceOrWindowSize?: MessageReactionService | number,
-  onHandled?: () => void
+  onHandled?: () => void,
+  managedWriteRecorder?: ManagedWriteRecorder
 ): void {
   const normalizedEvent = normalizeBeforeMessageWriteEvent(event, hookContext);
   logHookPayloadDebug(
@@ -923,7 +992,8 @@ export function handleBeforeMessageWrite(
     memoryGate,
     writeGuardian,
     memoryGateWindowSizeOrReactionService,
-    reactionServiceOrWindowSize
+    reactionServiceOrWindowSize,
+    managedWriteRecorder
   );
   onHandled?.();
 }

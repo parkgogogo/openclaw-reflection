@@ -278,6 +278,135 @@ test('handleBeforeMessageWrite reacts to the latest user message when write_guar
   ]);
 });
 
+test('handleBeforeMessageWrite persists a managed fact when write_guardian writes successfully', async () => {
+  const logger = createLogger();
+  const bufferManager = new SessionBufferManager(10, logger);
+  const managedWrites = [];
+
+  const memoryGate = {
+    async analyze() {
+      return {
+        decision: 'UPDATE_USER',
+        reason: 'stable collaboration preference',
+        candidateFact: 'prefers direct technical feedback',
+      };
+    },
+  };
+
+  const writeGuardian = {
+    async write() {
+      return {
+        status: 'written',
+      };
+    },
+  };
+
+  const reflectionService = {
+    async recordManagedWrite(input) {
+      managedWrites.push(input);
+      return { id: 'fact_1' };
+    },
+  };
+
+  handleMessageReceived({
+    from: 'discord:channel:room-7',
+    content: '以后请直接指出问题',
+    metadata: {
+      to: 'channel:room-7',
+      messageId: 'u7',
+    },
+  }, bufferManager, logger, {
+    channelId: 'discord',
+    accountId: 'default',
+    conversationId: 'room-7',
+  });
+
+  handleBeforeMessageWrite({
+    message: {
+      role: 'assistant',
+      content: [{ type: 'text', text: '我之后会直接指出问题。' }],
+    },
+  }, bufferManager, logger, {
+    sessionKey: 'channel:discord:channel:room-7',
+    agentId: 'main',
+  }, memoryGate, writeGuardian, 10, undefined, undefined, reflectionService);
+
+  await flush();
+
+  assert.deepEqual(managedWrites, [
+    {
+      fileName: 'USER.md',
+      text: 'prefers direct technical feedback',
+      provenance: {
+        decision: 'UPDATE_USER',
+        reason: 'stable collaboration preference',
+        recordedAt: managedWrites[0].provenance.recordedAt,
+        sessionKey: 'channel:discord:channel:room-7',
+        sourceMessageId: 'u7',
+      },
+    },
+  ]);
+  assert.equal(typeof managedWrites[0].provenance.recordedAt, 'string');
+});
+
+test('handleBeforeMessageWrite does not persist managed facts when write_guardian refuses', async () => {
+  const logger = createLogger();
+  const bufferManager = new SessionBufferManager(10, logger);
+  let managedWriteCalls = 0;
+
+  const memoryGate = {
+    async analyze() {
+      return {
+        decision: 'UPDATE_USER',
+        reason: 'stable collaboration preference',
+        candidateFact: 'prefers direct technical feedback',
+      };
+    },
+  };
+
+  const writeGuardian = {
+    async write() {
+      return {
+        status: 'refused',
+        reason: 'not durable enough',
+      };
+    },
+  };
+
+  const reflectionService = {
+    async recordManagedWrite() {
+      managedWriteCalls += 1;
+    },
+  };
+
+  handleMessageReceived({
+    from: 'discord:channel:room-8',
+    content: '以后请直接指出问题',
+    metadata: {
+      to: 'channel:room-8',
+      messageId: 'u8',
+    },
+  }, bufferManager, logger, {
+    channelId: 'discord',
+    accountId: 'default',
+    conversationId: 'room-8',
+  });
+
+  handleBeforeMessageWrite({
+    message: {
+      role: 'assistant',
+      content: [{ type: 'text', text: '收到。' }],
+    },
+  }, bufferManager, logger, {
+    sessionKey: 'channel:discord:channel:room-8',
+    agentId: 'main',
+  }, memoryGate, writeGuardian, 10, undefined, undefined, reflectionService);
+
+  await flush();
+
+  assert.equal(managedWriteCalls, 0);
+});
+
 test('handleBeforeMessageWrite ignores non-assistant messages', async () => {
   const logger = createLogger();
   const bufferManager = new SessionBufferManager(10, logger);

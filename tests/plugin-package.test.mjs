@@ -65,4 +65,7 @@ test("OpenClaw plugin e2e regression script uses an ephemeral sandbox and suppor
   assert.match(content, /echo "\[e2e\] bun install failed, falling back to npm"/);
   assert.match(content, /"\$NPM_BIN" install --silent --prefix "\$OPENCLAW_NPM_PREFIX" openclaw@latest/);
   assert.match(content, /OPENCLAW_MJS="\$OPENCLAW_NPM_PREFIX\/node_modules\/openclaw\/openclaw\.mjs"/);
+  assert.match(content, /REFLECTION_FILES_JSON="\$ARTIFACTS_DIR\/reflection-files\.json"/);
+  assert.match(content, /run_openclaw gateway call reflection\.files/);
+  assert.match(content, /'USER\\\.md'/);
 });

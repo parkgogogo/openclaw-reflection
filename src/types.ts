@@ -128,6 +128,46 @@ export interface PluginConfig {
   consolidation: ConsolidationConfig;
 }
 
+export type ManagedFileName =
+  | "MEMORY.md"
+  | "USER.md"
+  | "SOUL.md"
+  | "IDENTITY.md"
+  | "TOOLS.md";
+
+export type ManagedFactId = string;
+
+export type ReflectionProposalId = string;
+
+export type ReflectionProposalAction = "delete" | "edit" | "move";
+
+export type ReflectionProposalStatus = "pending" | "applied" | "discarded";
+
+export type ManagedFileHealth = "healthy" | "drifted" | "has_pending_proposal";
+
+export interface FactProvenanceSummary {
+  sourceMessageId?: string;
+  sessionKey?: string;
+  decision: MemoryDecision;
+  reason: string;
+  recordedAt: string;
+}
+
+export interface ProposalSummary {
+  id: ReflectionProposalId;
+  action: ReflectionProposalAction;
+  status: ReflectionProposalStatus;
+  factId: ManagedFactId;
+  fileName: ManagedFileName;
+  createdAt: string;
+}
+
+export interface ProposalDetail extends ProposalSummary {
+  proposedText?: string;
+  targetFileName?: ManagedFileName;
+  diff: string;
+}
+
 export type { MemoryGateInput } from "./memory-gate/types.js";
 export type {
   AgentRunResult,

@@ -102,6 +102,7 @@ GATEWAY_LOG="$ARTIFACTS_DIR/gateway.log"
 HEALTH_JSON="$ARTIFACTS_DIR/health.json"
 AGENT_JSON="$ARTIFACTS_DIR/agent-result.json"
 AGENT_ERR="$ARTIFACTS_DIR/agent-result.stderr.log"
+REFLECTION_FILES_JSON="$ARTIFACTS_DIR/reflection-files.json"
 PLUGIN_LOG=""
 DEBUG_LOG=""
 TARBALL_PATH=""
@@ -341,6 +342,18 @@ fi
 
 if ! rg -q 'before_message_write' "$PLUGIN_LOG"; then
   fail "plugin log does not show assistant-side hook evidence"
+fi
+
+echo "[e2e] calling reflection.files gateway method"
+if ! run_openclaw gateway call reflection.files \
+  --json \
+  --params '{}' \
+  >"$REFLECTION_FILES_JSON" 2>>"$AGENT_ERR"; then
+  fail "reflection.files gateway method call failed"
+fi
+
+if ! rg -q 'USER\.md' "$REFLECTION_FILES_JSON"; then
+  fail "reflection.files gateway response did not include managed file names"
 fi
 
 echo "[e2e] gateway health ok"

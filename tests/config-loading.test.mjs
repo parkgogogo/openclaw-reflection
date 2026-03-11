@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
 async function importFresh(modulePath) {
@@ -237,6 +238,28 @@ test("resolveWorkspaceDir refuses filesystem root fallback when workspace is mis
     reason:
       'Missing plugin config "workspaceDir" and process.cwd() resolved to the filesystem root',
   });
+});
+
+test("types.d.ts exports reflection memory-management domain types", async () => {
+  const declaration = await readFile(path.join(process.cwd(), "dist/types.d.ts"), "utf8");
+
+  for (const exportName of [
+    "ManagedFileName",
+    "ManagedFactId",
+    "ReflectionProposalId",
+    "ReflectionProposalAction",
+    "ReflectionProposalStatus",
+    "ManagedFileHealth",
+    "FactProvenanceSummary",
+    "ProposalSummary",
+    "ProposalDetail",
+  ]) {
+    assert.match(
+      declaration,
+      new RegExp(`export (type|interface) ${exportName}\\b`),
+      `expected dist/types.d.ts to export ${exportName}`
+    );
+  }
 });
 
 test("activate logs a sanitized config snapshot and skips registration in config-only mode", async () => {
