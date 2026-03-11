@@ -26,6 +26,7 @@
     "test": "pnpm run build && node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "e2e:openclaw-plugin": "bash scripts/e2e-openclaw-plugin.sh",
+    "e2e:openclaw-plugin:latest": "OPENCLAW_E2E_TRACK=latest bash scripts/e2e-openclaw-plugin.sh",
     "eval:memory-gate": "pnpm exec tsc && node evals/run.mjs --suite memory-gate",
     "eval:write-guardian": "pnpm exec tsc && node evals/run.mjs --suite write-guardian",
     "eval:all": "pnpm exec tsc && node evals/run.mjs --suite all"

@@ -247,6 +247,8 @@ Reflection 当前支持：
 
 ```bash
 pnpm run typecheck
+pnpm run e2e:openclaw-plugin
+pnpm run e2e:openclaw-plugin:latest
 pnpm run eval:memory-gate
 pnpm run eval:write-guardian
 pnpm run eval:all
@@ -261,9 +263,20 @@ node evals/run.mjs \
 
 `evals/models.json` 定义对比矩阵，provider 配置来自 `EVAL_BASE_URL` 和 `EVAL_API_KEY`。JSON 用于自动化，Markdown 供人工阅读。
 
-详见 [evals/README.md](./evals/README.md)。
+现在 OpenClaw 插件 e2e 默认走一次性临时沙箱：
 
----
+- `pnpm run e2e:openclaw-plugin` 运行 pinned 的本地回归轨
+- `pnpm run e2e:openclaw-plugin:latest` 会优先用 Bun 把最新 OpenClaw CLI 安装到临时目录，必要时回退到 npm，再跑同样的检查
+- 两条轨都会把 `HOME`、profile 状态、workspace、日志和 npm cache 全部隔离到临时目录
+- 如果你要保留现场排查，设置 `KEEP_E2E_ARTIFACTS=1`
+
+这条 e2e 会端到端验证三件事：
+
+- 插件 tarball 能在全新的 OpenClaw profile 中安装并被加载
+- 一次受控 chat turn 会留下 inbound capture 和 assistant-side processing 的 hook 证据
+- 插件日志以及 `debug.json` 会在沙箱里正常写出
+
+更多评测说明见 [evals/README.md](./evals/README.md)。
 
 ## 模型选择
 

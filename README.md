@@ -247,6 +247,8 @@ These benchmarks target the failure modes that break memory systems:
 
 ```bash
 pnpm run typecheck
+pnpm run e2e:openclaw-plugin
+pnpm run e2e:openclaw-plugin:latest
 pnpm run eval:memory-gate
 pnpm run eval:write-guardian
 pnpm run eval:all
@@ -261,9 +263,20 @@ node evals/run.mjs \
 
 Configuration in `evals/models.json` defines the comparison matrix. Provider settings come from `EVAL_BASE_URL` and `EVAL_API_KEY`.
 
-More details: [evals/README.md](./evals/README.md)
+The OpenClaw plugin e2e runner now uses an ephemeral sandbox by default:
 
----
+- `pnpm run e2e:openclaw-plugin` runs the pinned local regression track
+- `pnpm run e2e:openclaw-plugin:latest` prefers Bun for the temporary latest OpenClaw install, falls back to npm if needed, and runs the same checks
+- both tracks isolate `HOME`, profile state, workspace, logs, and npm cache under a throwaway temp root
+- set `KEEP_E2E_ARTIFACTS=1` if you want the sandbox preserved for debugging after the run
+
+The e2e checks three things end-to-end:
+
+- the plugin tarball installs and loads into a fresh OpenClaw profile
+- a controlled chat turn leaves hook evidence for inbound capture and assistant-side processing
+- plugin logs and `debug.json` are written inside the sandbox
+
+More eval details: [evals/README.md](./evals/README.md)
 
 ## Model Selection
 

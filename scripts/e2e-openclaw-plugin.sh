@@ -2,9 +2,32 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOST_HOME="${HOME}"
 PROFILE_NAME="${OPENCLAW_TEST_PROFILE:-reflection-package-test}"
 GATEWAY_PORT="${OPENCLAW_TEST_GATEWAY_PORT:-18891}"
 MODEL_ID="grok-4.1-fast"
+OPENCLAW_E2E_TRACK="${OPENCLAW_E2E_TRACK:-pinned}"
+KEEP_E2E_ARTIFACTS="${KEEP_E2E_ARTIFACTS:-0}"
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/openclaw-reflection-e2e.XXXXXX")"
+ARTIFACTS_DIR="$TMP_ROOT/artifacts"
+WORKSPACE_DIR="$TMP_ROOT/workspace"
+OPENCLAW_BUN_APP_DIR="$TMP_ROOT/openclaw-cli-app"
+OPENCLAW_NPM_PREFIX="$OPENCLAW_BUN_APP_DIR"
+
+export HOME="$TMP_ROOT/home"
+export XDG_CONFIG_HOME="$TMP_ROOT/xdg-config"
+export XDG_CACHE_HOME="$TMP_ROOT/xdg-cache"
+export XDG_DATA_HOME="$TMP_ROOT/xdg-data"
+export npm_config_cache="$TMP_ROOT/npm-cache"
+
+mkdir -p \
+  "$HOME" \
+  "$XDG_CONFIG_HOME" \
+  "$XDG_CACHE_HOME" \
+  "$XDG_DATA_HOME" \
+  "$npm_config_cache" \
+  "$ARTIFACTS_DIR" \
+  "$WORKSPACE_DIR"
 
 if [[ ! -f "$ROOT_DIR/.env" ]]; then
   echo "Missing $ROOT_DIR/.env" >&2
@@ -18,7 +41,7 @@ set +a
 : "${EVAL_BASE_URL:?EVAL_BASE_URL is required in .env}"
 : "${EVAL_API_KEY:?EVAL_API_KEY is required in .env}"
 
-NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+NVM_DIR="${NVM_DIR:-$HOST_HOME/.nvm}"
 if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
   echo "nvm is required at $NVM_DIR/nvm.sh" >&2
   exit 1
@@ -32,49 +55,155 @@ if [[ ! -x "$NODE_BIN" ]]; then
   exit 1
 fi
 
-NODE_PREFIX="$(cd "$(dirname "$NODE_BIN")/.." && pwd)"
-OPENCLAW_MJS="$NODE_PREFIX/lib/node_modules/openclaw/openclaw.mjs"
-if [[ ! -f "$OPENCLAW_MJS" ]]; then
-  echo "OpenClaw CLI not found for Node 22 at $OPENCLAW_MJS" >&2
+NPM_BIN="$(cd "$(dirname "$NODE_BIN")" && pwd)/npm"
+if [[ ! -x "$NPM_BIN" ]]; then
+  echo "npm is required next to Node 22 at $NPM_BIN" >&2
   exit 1
 fi
+
+BUN_BIN="$(command -v bun || true)"
+
+NODE_PREFIX="$(cd "$(dirname "$NODE_BIN")/.." && pwd)"
+OPENCLAW_MJS="$NODE_PREFIX/lib/node_modules/openclaw/openclaw.mjs"
+if [[ "$OPENCLAW_E2E_TRACK" == "latest" ]]; then
+  if [[ -n "$BUN_BIN" ]]; then
+    echo "[e2e] installing latest OpenClaw into sandbox with bun"
+    rm -rf "$OPENCLAW_BUN_APP_DIR"
+    mkdir -p "$OPENCLAW_BUN_APP_DIR"
+    if ! (
+      cd "$OPENCLAW_BUN_APP_DIR" &&
+      bun init -y >/dev/null 2>&1 &&
+      "$BUN_BIN" add --silent openclaw@latest >/dev/null
+    ); then
+      echo "[e2e] bun install failed, falling back to npm"
+      rm -rf "$OPENCLAW_BUN_APP_DIR"
+    fi
+  fi
+
+  if [[ ! -d "$OPENCLAW_NPM_PREFIX/node_modules/openclaw" ]]; then
+    mkdir -p "$OPENCLAW_NPM_PREFIX"
+    echo "[e2e] installing latest OpenClaw into sandbox with npm"
+    "$NPM_BIN" install --silent --prefix "$OPENCLAW_NPM_PREFIX" openclaw@latest
+  fi
+
+  OPENCLAW_MJS="$OPENCLAW_NPM_PREFIX/node_modules/openclaw/openclaw.mjs"
+fi
+
+if [[ ! -f "$OPENCLAW_MJS" ]]; then
+  echo "OpenClaw CLI not found at $OPENCLAW_MJS" >&2
+  exit 1
+fi
+
+PROFILE_DIR="$HOME/.openclaw-$PROFILE_NAME"
+PROFILE_CONFIG="$PROFILE_DIR/openclaw.json"
+EXTENSIONS_DIR="$PROFILE_DIR/extensions"
+TMP_CONFIG_JSON="$ARTIFACTS_DIR/plugin-config.json"
+GATEWAY_LOG="$ARTIFACTS_DIR/gateway.log"
+HEALTH_JSON="$ARTIFACTS_DIR/health.json"
+AGENT_JSON="$ARTIFACTS_DIR/agent-result.json"
+AGENT_ERR="$ARTIFACTS_DIR/agent-result.stderr.log"
+PLUGIN_LOG=""
+DEBUG_LOG=""
+TARBALL_PATH=""
+GATEWAY_PID=""
 
 run_openclaw() {
   "$NODE_BIN" "$OPENCLAW_MJS" --profile "$PROFILE_NAME" "$@"
 }
 
-PROFILE_CONFIG="$HOME/.openclaw-$PROFILE_NAME/openclaw.json"
-PROFILE_DIR="$HOME/.openclaw-$PROFILE_NAME"
-EXTENSIONS_DIR="$PROFILE_DIR/extensions"
-if [[ ! -f "$PROFILE_CONFIG" ]]; then
-  echo "Profile $PROFILE_NAME does not exist at $PROFILE_CONFIG" >&2
-  echo "Create it once first, then rerun this script." >&2
-  exit 1
-fi
-
-TMP_CONFIG_JSON="$(mktemp)"
-GATEWAY_LOG="$(mktemp)"
-HEALTH_JSON="$(mktemp)"
-TARBALL_PATH=""
-GATEWAY_PID=""
+print_artifact_location() {
+  echo "[e2e] artifacts: $TMP_ROOT"
+}
 
 cleanup() {
+  local rc="${1:-0}"
+
   if [[ -n "$GATEWAY_PID" ]] && kill -0 "$GATEWAY_PID" 2>/dev/null; then
     pkill -TERM -P "$GATEWAY_PID" 2>/dev/null || true
     kill "$GATEWAY_PID" 2>/dev/null || true
   fi
-  rm -f "$TMP_CONFIG_JSON" "$GATEWAY_LOG" "$HEALTH_JSON"
+
   if [[ -n "$TARBALL_PATH" && -f "$TARBALL_PATH" ]]; then
     rm -f "$TARBALL_PATH"
   fi
+
+  if [[ "$KEEP_E2E_ARTIFACTS" == "1" ]]; then
+    print_artifact_location
+    return
+  fi
+
+  if [[ "$rc" != "0" ]]; then
+    print_artifact_location
+    return
+  fi
+
+  rm -rf "$TMP_ROOT"
 }
-trap 'rc=$?; trap - EXIT; cleanup; exit "$rc"' EXIT
+trap 'rc=$?; trap - EXIT; cleanup "$rc"; exit "$rc"' EXIT
+
+fail() {
+  local message="$1"
+  echo "[e2e] $message" >&2
+  if [[ -f "$PLUGIN_LOG" ]]; then
+    echo "--- plugin log ---" >&2
+    tail -n 100 "$PLUGIN_LOG" >&2 || true
+  fi
+  if [[ -f "$DEBUG_LOG" ]]; then
+    echo "--- debug payload ---" >&2
+    cat "$DEBUG_LOG" >&2 || true
+  fi
+  if [[ -f "$GATEWAY_LOG" ]]; then
+    echo "--- gateway log ---" >&2
+    cat "$GATEWAY_LOG" >&2 || true
+  fi
+  if [[ -f "$AGENT_ERR" ]]; then
+    echo "--- agent stderr ---" >&2
+    cat "$AGENT_ERR" >&2 || true
+  fi
+  exit 1
+}
+
+echo "[e2e] bootstrapping isolated profile in $TMP_ROOT"
+ONBOARD_ARGS=(
+  --non-interactive
+  --accept-risk
+  --mode local
+  --flow quickstart
+  --workspace "$WORKSPACE_DIR"
+  --gateway-bind loopback
+  --gateway-port "$GATEWAY_PORT"
+  --skip-channels
+  --skip-skills
+  --skip-ui
+  --skip-health
+  --skip-daemon
+)
+
+if [[ "$EVAL_BASE_URL" == *"openrouter.ai"* ]]; then
+  ONBOARD_ARGS+=(
+    --auth-choice openrouter-api-key
+    --openrouter-api-key "$EVAL_API_KEY"
+  )
+else
+  ONBOARD_ARGS+=(
+    --auth-choice custom-api-key
+    --custom-api-key "$EVAL_API_KEY"
+    --custom-base-url "$EVAL_BASE_URL"
+    --custom-model-id "$MODEL_ID"
+  )
+fi
+
+run_openclaw onboard "${ONBOARD_ARGS[@]}" >/dev/null
+
+if [[ ! -f "$PROFILE_CONFIG" ]]; then
+  fail "OpenClaw onboarding did not create profile config at $PROFILE_CONFIG"
+fi
 
 cat > "$TMP_CONFIG_JSON" <<EOF
 {
-  "workspaceDir": "$HOME/.openclaw-$PROFILE_NAME/workspace",
+  "workspaceDir": "$TMP_ROOT/workspace",
   "bufferSize": 50,
-  "logLevel": "info",
+  "logLevel": "debug",
   "llm": {
     "baseURL": "$EVAL_BASE_URL",
     "apiKey": "$EVAL_API_KEY",
@@ -85,7 +214,7 @@ cat > "$TMP_CONFIG_JSON" <<EOF
     "windowSize": 10
   },
   "consolidation": {
-    "enabled": true,
+    "enabled": false,
     "schedule": "0 2 * * *"
   }
 }
@@ -146,30 +275,24 @@ config.plugins.entries["openclaw-reflection"] = {
 
 fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
 EOF
-run_openclaw config validate --json
+
+run_openclaw config validate --json >"$ARTIFACTS_DIR/config-validate.json"
 
 if lsof -nP -iTCP:"$GATEWAY_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "Gateway port $GATEWAY_PORT is already in use" >&2
-  exit 1
+  fail "Gateway port $GATEWAY_PORT is already in use"
 fi
 
-PLUGIN_LOG="$EXTENSIONS_DIR/openclaw-reflection/logs/reflection-$(date +%F).log"
+PLUGIN_LOG="$(find "$EXTENSIONS_DIR/openclaw-reflection/logs" -maxdepth 1 -name 'reflection-*.log' -type f 2>/dev/null | sort | tail -n 1)"
+DEBUG_LOG="$EXTENSIONS_DIR/openclaw-reflection/logs/debug.json"
 SUCCESS_MARKER="Plugin registered successfully, all hooks active"
 
 echo "[e2e] starting gateway on port $GATEWAY_PORT"
-(exec "$NODE_BIN" "$OPENCLAW_MJS" --profile "$PROFILE_NAME" gateway run --verbose >"$GATEWAY_LOG" 2>&1) &
+(env OPENCLAW_REFLECTION_DEBUG_EVENTS=1 "$NODE_BIN" "$OPENCLAW_MJS" --profile "$PROFILE_NAME" gateway run --verbose >"$GATEWAY_LOG" 2>&1) &
 GATEWAY_PID=$!
 
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   if [[ -n "$GATEWAY_PID" ]] && ! kill -0 "$GATEWAY_PID" 2>/dev/null; then
-    echo "[e2e] gateway exited before becoming healthy" >&2
-    echo "--- plugin log ---" >&2
-    if [[ -f "$PLUGIN_LOG" ]]; then
-      tail -n 50 "$PLUGIN_LOG" >&2
-    fi
-    echo "--- gateway log ---" >&2
-    cat "$GATEWAY_LOG" >&2
-    exit 1
+    fail "gateway exited before becoming healthy"
   fi
 
   if curl --silent --show-error --fail --max-time 2 "http://127.0.0.1:$GATEWAY_PORT/health" >"$HEALTH_JSON" 2>/dev/null; then
@@ -179,24 +302,45 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
   sleep 1
 done
 
+if [[ -z "$PLUGIN_LOG" ]]; then
+  PLUGIN_LOG="$(find "$EXTENSIONS_DIR/openclaw-reflection/logs" -maxdepth 1 -name 'reflection-*.log' -type f 2>/dev/null | sort | tail -n 1)"
+fi
+
 if ! rg -q '"ok":[[:space:]]*true' "$HEALTH_JSON"; then
-  echo "[e2e] gateway health probe did not succeed" >&2
-  echo "--- gateway log ---" >&2
-  cat "$GATEWAY_LOG" >&2
-  exit 1
+  fail "gateway health probe did not succeed"
 fi
 
 if ! [[ -f "$PLUGIN_LOG" ]] || ! rg -q "$SUCCESS_MARKER" "$PLUGIN_LOG"; then
-  echo "[e2e] plugin did not report successful registration" >&2
-  echo "--- plugin log ---" >&2
-  if [[ -f "$PLUGIN_LOG" ]]; then
-    tail -n 50 "$PLUGIN_LOG" >&2
-  else
-    echo "plugin log not found: $PLUGIN_LOG" >&2
-  fi
-  echo "--- gateway log ---" >&2
-  cat "$GATEWAY_LOG" >&2
-  exit 1
+  fail "plugin did not report successful registration"
+fi
+
+TURN_ID="e2e-$(date +%s)-$$"
+CHAT_SEND_PARAMS="$(printf '{"sessionKey":"main","message":"Remember this test turn: your name is Lia and call me Park.","idempotencyKey":"%s","timeoutMs":120000}' "$TURN_ID")"
+
+echo "[e2e] running controlled gateway turn to verify hook capture"
+if ! run_openclaw gateway call chat.send \
+  --json \
+  --params "$CHAT_SEND_PARAMS" \
+  >"$AGENT_JSON" 2>"$AGENT_ERR"; then
+  fail "chat.send turn failed"
+fi
+
+sleep 2
+
+if ! [[ -f "$DEBUG_LOG" ]]; then
+  fail "message_received debug payload was not written"
+fi
+
+if ! rg -q '"hookName":[[:space:]]*"message_received"' "$DEBUG_LOG"; then
+  fail "debug payload does not show message_received hook capture"
+fi
+
+if ! rg -q 'message:received|message_received' "$PLUGIN_LOG"; then
+  fail "plugin log does not show inbound message capture evidence"
+fi
+
+if ! rg -q 'before_message_write' "$PLUGIN_LOG"; then
+  fail "plugin log does not show assistant-side hook evidence"
 fi
 
 echo "[e2e] gateway health ok"
