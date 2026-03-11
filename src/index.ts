@@ -8,6 +8,7 @@ import {
 import { ConsolidationScheduler } from "./consolidation/index.js";
 import { LLMService as SharedLLMService } from "./llm/service.js";
 import { FileLogger } from "./logger.js";
+import { HeartbeatService, resolveHeartbeatIntervalMs } from "./heartbeat.js";
 import {
   MemoryGateAnalyzer,
 } from "./memory-gate/index.js";
@@ -64,6 +65,7 @@ export interface PluginAPI {
 let bufferManager: SessionBufferManager | null = null;
 let gatewayLogger: PluginLogger | null = null;
 let fileLogger: FileLogger | null = null;
+let heartbeatService: HeartbeatService | null = null;
 let isRegistered = false;
 const REFLECTION_COMMAND_NAME = "reflections";
 
@@ -255,6 +257,12 @@ export default function activate(api: PluginAPI): void {
 
     const workspaceResolution = resolveWorkspaceDir(api);
     const workspaceDir = workspaceResolution.workspaceDir;
+    heartbeatService = new HeartbeatService({
+      logger,
+      workspaceDir,
+      getBufferedSessions: () => bufferManager?.getSessionCount() ?? 0,
+      intervalMs: resolveHeartbeatIntervalMs(),
+    });
 
     if (workspaceDir) {
       logger.info("PluginLifecycle", "Workspace resolved", {
@@ -345,7 +353,8 @@ export default function activate(api: PluginAPI): void {
               memoryGate,
               writeGuardian,
               config.memoryGate.windowSize,
-              reactionService
+              reactionService,
+              () => heartbeatService?.markBeforeMessageWrite()
             );
           } else {
             logger.warn("PluginLifecycle", "Callback skipped: buffer manager missing", {
@@ -370,7 +379,13 @@ export default function activate(api: PluginAPI): void {
           });
 
           if (bufferManager) {
-            handleMessageReceived(event, bufferManager, logger, context);
+            handleMessageReceived(
+              event,
+              bufferManager,
+              logger,
+              context,
+              () => heartbeatService?.markMessageReceived()
+            );
             logger.debug("PluginLifecycle", "Callback dispatched", {
               hook: "message_received",
             });
@@ -384,6 +399,7 @@ export default function activate(api: PluginAPI): void {
     );
 
     registerReflectionCommand(api, logger, writeGuardianAuditLog);
+    heartbeatService.start();
 
     gatewayLogger.info("[Reflection] Message hooks registered");
     logger.info("PluginLifecycle", "Message hooks registered");

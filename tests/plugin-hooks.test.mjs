@@ -15,6 +15,10 @@ function createPluginLogger() {
   };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 test('activate registers message hooks through registerHook when api.on is unavailable', async () => {
   const indexUrl = pathToFileURL(path.join(process.cwd(), 'dist/index.js')).href;
   const mod = await import(`${indexUrl}?t=${Date.now()}`);
@@ -231,4 +235,111 @@ test('activate does not write logs/debug.json outside debug mode', async () => {
   );
 
   await assert.rejects(fs.readFile(debugLogPath, 'utf8'), /ENOENT/);
+});
+
+test('activate starts heartbeat logging and tracks hook activity timestamps', async () => {
+  const previousInterval = process.env.OPENCLAW_REFLECTION_HEARTBEAT_INTERVAL_MS;
+  process.env.OPENCLAW_REFLECTION_HEARTBEAT_INTERVAL_MS = '5';
+
+  const loggerUrl = pathToFileURL(path.join(process.cwd(), 'dist/logger.js')).href;
+  const loggerMod = await import(loggerUrl);
+  const originalInfo = loggerMod.FileLogger.prototype.info;
+  const entries = [];
+
+  loggerMod.FileLogger.prototype.info = function patchedInfo(component, event, details, sessionKey) {
+    entries.push({ component, event, details, sessionKey });
+    return originalInfo.call(this, component, event, details, sessionKey);
+  };
+
+  try {
+    const indexUrl = pathToFileURL(path.join(process.cwd(), 'dist/index.js')).href;
+    const mod = await import(`${indexUrl}?t=${Date.now()}-heartbeat`);
+    const activate = mod.default;
+
+    const observed = [];
+    const api = {
+      logger: createPluginLogger(),
+      config: {
+        get(key) {
+          if (key === 'logLevel') return 'debug';
+          if (key === 'memoryGate') return { enabled: false };
+          if (key === 'consolidation') return { enabled: false };
+          return undefined;
+        },
+      },
+      registerHook() {},
+      on(event, handler) {
+        observed.push({ event, handler });
+      },
+    };
+
+    activate(api);
+    await sleep(20);
+
+    const startedEntry = entries.find(
+      (entry) => entry.component === 'Heartbeat' && entry.event === 'heartbeat started'
+    );
+    assert.ok(startedEntry);
+
+    const firstTickEntry = entries.find(
+      (entry) => entry.component === 'Heartbeat' && entry.event === 'heartbeat tick'
+    );
+    assert.ok(firstTickEntry);
+    assert.equal(firstTickEntry.details.lastMessageReceivedAt, null);
+    assert.equal(firstTickEntry.details.lastBeforeMessageWriteAt, null);
+
+    const receivedHandler = observed.find((entry) => entry.event === 'message_received')?.handler;
+    const beforeWriteHandler = observed.find(
+      (entry) => entry.event === 'before_message_write'
+    )?.handler;
+
+    assert.ok(receivedHandler);
+    assert.ok(beforeWriteHandler);
+
+    receivedHandler(
+      {
+        from: 'discord:channel:heartbeat-room',
+        content: 'user message',
+        metadata: { to: 'channel:heartbeat-room', messageId: 'hb-u1' },
+      },
+      {
+        channelId: 'discord',
+        accountId: 'acct-heartbeat',
+        conversationId: 'heartbeat-room',
+      }
+    );
+
+    beforeWriteHandler(
+      {
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'assistant reply' }],
+        },
+      },
+      {
+        sessionKey: 'agent:main:discord:channel:heartbeat-room',
+        agentId: 'main',
+      }
+    );
+
+    await sleep(20);
+
+    const heartbeatTicks = entries.filter(
+      (entry) => entry.component === 'Heartbeat' && entry.event === 'heartbeat tick'
+    );
+    const updatedTick = heartbeatTicks.find(
+      (entry) =>
+        typeof entry.details?.lastMessageReceivedAt === 'string' &&
+        typeof entry.details?.lastBeforeMessageWriteAt === 'string'
+    );
+
+    assert.ok(updatedTick);
+  } finally {
+    loggerMod.FileLogger.prototype.info = originalInfo;
+    if (previousInterval === undefined) {
+      delete process.env.OPENCLAW_REFLECTION_HEARTBEAT_INTERVAL_MS;
+    } else {
+      process.env.OPENCLAW_REFLECTION_HEARTBEAT_INTERVAL_MS = previousInterval;
+    }
+  }
 });

@@ -55,7 +55,13 @@ openclaw plugins install @parkgogogo/openclaw-reflection
 
 **5. Check your memory files** — `MEMORY.md`, `USER.md`, `TOOLS.md`, `IDENTITY.md`, `SOUL.md`.
 
-When Reflection successfully writes memory, you'll see a `📝` reaction on your message.
+- Reflection now writes an independent write_guardian audit log to:
+  - `<workspaceDir>/.openclaw-reflection/write-guardian.log.jsonl`
+- When `logLevel` is `debug`, Reflection also overwrites `logs/debug.json` with the latest raw `message_received` callback payload.
+- Reflection also writes periodic `Heartbeat` events into the normal plugin log. If heartbeat keeps advancing while `lastMessageReceivedAt` stays stale, the plugin is alive and simply not receiving inbound traffic.
+- When `write_guardian` successfully writes durable memory, Reflection reacts to the triggering user message with `📝`.
+- Register command: `reflections`
+  - Returns the most recent 10 write_guardian behaviors (written/refused/failed/skipped), including decision, target file, and reason.
 
 For detailed install instructions, see [INSTALL.md](./INSTALL.md).
 

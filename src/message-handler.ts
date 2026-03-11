@@ -711,7 +711,8 @@ export function handleMessageReceived(
   event: unknown,
   bufferManager: SessionBufferManager,
   logger: Logger,
-  hookContext?: unknown
+  hookContext?: unknown,
+  onHandled?: () => void
 ): void {
   const normalizedEvent = normalizeReceivedEvent(event, hookContext);
   logHookPayloadDebug(
@@ -763,6 +764,7 @@ export function handleMessageReceived(
   );
 
   bufferManager.push(sessionKey, message);
+  onHandled?.();
 }
 
 function handleAgentMessage(
@@ -892,7 +894,8 @@ export function handleBeforeMessageWrite(
   memoryGate?: MemoryGateAnalyzer,
   writeGuardian?: WriteGuardian,
   memoryGateWindowSizeOrReactionService?: number | MessageReactionService,
-  reactionServiceOrWindowSize?: MessageReactionService | number
+  reactionServiceOrWindowSize?: MessageReactionService | number,
+  onHandled?: () => void
 ): void {
   const normalizedEvent = normalizeBeforeMessageWriteEvent(event, hookContext);
   logHookPayloadDebug(
@@ -922,6 +925,7 @@ export function handleBeforeMessageWrite(
     memoryGateWindowSizeOrReactionService,
     reactionServiceOrWindowSize
   );
+  onHandled?.();
 }
 
 export function handleSessionEnd(

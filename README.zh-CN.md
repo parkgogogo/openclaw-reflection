@@ -55,7 +55,13 @@ openclaw plugins install @parkgogogo/openclaw-reflection
 
 **5. 查看记忆文件** —— `MEMORY.md`、`USER.md`、`TOOLS.md`、`IDENTITY.md`、`SOUL.md`。
 
-当 Reflection 成功写入记忆时，你的消息会显示 `📝` 反应。
+- Reflection 现在会给 write_guardian 单独写一份审计日志：
+  - `<workspaceDir>/.openclaw-reflection/write-guardian.log.jsonl`
+- 当 `logLevel` 为 `debug` 时，Reflection 还会把最近一次 `message_received` callback 的原始 payload 覆盖写入 `logs/debug.json`。
+- Reflection 还会在常规插件日志里周期性写入 `Heartbeat` 事件。如果 heartbeat 持续推进，但 `lastMessageReceivedAt` 一直没更新，说明插件还活着，只是没有收到新的入站消息。
+- 当 `write_guardian` 成功写入长期记忆时，Reflection 会给触发这次写入的用户消息补一个 `📝` reaction。
+- 注册命令：`reflections`
+  - 返回最近 10 条 write_guardian 行为（written/refused/failed/skipped），包含 decision、目标文件和原因。
 
 详细安装指引见 [INSTALL.md](./INSTALL.md)。
 
